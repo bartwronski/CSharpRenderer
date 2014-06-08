@@ -136,32 +136,11 @@
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
     </None>
-    <None Include="mesh_rendering.fx">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <Compile Include="Properties\Settings.Designer.cs">
       <AutoGen>True</AutoGen>
       <DependentUpon>Settings.settings</DependentUpon>
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
     </Compile>
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="compute.fx">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="constants.fx">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="evsm.fx" />
-    <Content Include="evsm_inc.fx" />
-    <Content Include="FXAA.hlsl" />
-    <Content Include="global_illumination_gen.fx" />
-    <Content Include="posteffects_dof.fx" />
-    <Content Include="posteffects_temporal.fx" />
-    <Content Include="posteffect_helpers.fx" />
-    <Content Include="sampler_states.fx" />
-    <Content Include="shader_fast_math.fx" />
-    <Content Include="ssao.fx" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
