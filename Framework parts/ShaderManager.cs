@@ -48,7 +48,7 @@ namespace CSharpRenderer
 
         class IncludeFX : Include
         {
-            static string includeDirectory = "";
+            static string includeDirectory = "shaders\\";
 
             public void Close(Stream stream)
             {
@@ -59,7 +59,7 @@ namespace CSharpRenderer
             public void Open(IncludeType type, string fileName, Stream parentStream, out Stream stream)
             {
                 stream = new FileStream(includeDirectory + fileName, FileMode.Open);
-                m_CurrentlyProcessedShader.m_UsedIncludes.Add(Directory.GetCurrentDirectory() + "\\" + fileName);
+                m_CurrentlyProcessedShader.m_UsedIncludes.Add(Directory.GetCurrentDirectory() + "\\shaders\\" + fileName);
             }
         }
 
@@ -126,7 +126,7 @@ namespace CSharpRenderer
                 w.Changed += new FileSystemEventHandler(OnFileChanged);
                 w.Renamed += new RenamedEventHandler(OnFileChanged);
                 w.NotifyFilter = NotifyFilters.LastAccess | NotifyFilters.LastWrite | NotifyFilters.FileName;
-                w.Path = Directory.GetCurrentDirectory();
+                w.Path = Directory.GetCurrentDirectory() + "\\shaders";
                 w.EnableRaisingEvents = true;
                 m_Watchers.Add(w);
             }
@@ -135,7 +135,7 @@ namespace CSharpRenderer
             m_Include = new IncludeFX();
 
             CultureInfo ci = new CultureInfo("en-US", false);
-            string[] filePaths = filters.SelectMany(f => Directory.GetFiles(Directory.GetCurrentDirectory(), f)).ToArray();
+            string[] filePaths = filters.SelectMany(f => Directory.GetFiles(Directory.GetCurrentDirectory() + "\\shaders", f)).ToArray();
 
 
             foreach (string path in filePaths)
