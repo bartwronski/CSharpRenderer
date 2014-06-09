@@ -25,6 +25,7 @@ namespace CSharpRenderer
     [Serializable]
     class ObjFileLoader
     {
+        public List<MyVertex> m_objVertices;
         public List<MyVertex> m_Vertices;
         public List<Int32> m_Indices;
         public List<Vector3> m_Normals;
@@ -38,6 +39,7 @@ namespace CSharpRenderer
 
         public ObjFileLoader()
         {
+            m_objVertices = new List<MyVertex>();
             m_Vertices = new List<MyVertex>();
             m_Indices = new List<Int32>();
             m_MaterialIndices = new List<Int32>();
@@ -165,7 +167,7 @@ namespace CSharpRenderer
                             v.x = Convert.ToSingle(tokens[1], ci) / 100.0f;
                             v.y = Convert.ToSingle(tokens[2], ci) / 100.0f;
                             v.z = Convert.ToSingle(tokens[3], ci) / 100.0f;
-                            m_Vertices.Add(v);
+                            m_objVertices.Add(v);
 
                             m_BoundingBoxMax = Vector3.Maximize(m_BoundingBoxMax, new Vector3(v.x, v.y, v.z));
                             m_BoundingBoxMin = Vector3.Minimize(m_BoundingBoxMin, new Vector3(v.x, v.y, v.z));
@@ -204,15 +206,20 @@ namespace CSharpRenderer
                                     Int32 normalIndex = Convert.ToInt32(splitTokens[2]);
                                     Int32 uvIndex = Convert.ToInt32(splitTokens[1]);
 
-                                    MyVertex v = m_Vertices[tmpArray[i] - 1];
+                                    MyVertex objVertex = m_objVertices[tmpArray[i] - 1];
+
+                                    MyVertex v = new MyVertex();
+                                    v = objVertex;
+
                                     v.nx += m_Normals[normalIndex - 1].X;
                                     v.ny += m_Normals[normalIndex - 1].Y;
                                     v.nz += m_Normals[normalIndex - 1].Z;
 
                                     v.u = m_TexCoords[uvIndex - 1].X;
-                                    v.v = m_TexCoords[uvIndex - 1].Y;
+                                    v.v = 1.0f - m_TexCoords[uvIndex - 1].Y;
 
-                                    m_Vertices[tmpArray[i] - 1] = v;
+                                    m_Vertices.Add(v);
+                                    tmpArray[i] = m_Vertices.Count;
                                 }
 
                                 m_Indices.Add(tmpArray[0]-1);
@@ -228,19 +235,22 @@ namespace CSharpRenderer
                                 {
                                     var splitTokens = tokens[i + 1].Split(new String[] { "/" }, StringSplitOptions.RemoveEmptyEntries);
                                     Int32 index = Convert.ToInt32(splitTokens[0]) - 1;
-
-                                    m_Indices.Add(index);
-
                                     Int32 normalIndex = Convert.ToInt32(splitTokens[2]);
                                     Int32 uvIndex = Convert.ToInt32(splitTokens[1]);
 
-                                    MyVertex v = m_Vertices[index];
+                                    MyVertex objVertex = m_objVertices[index];
+
+                                    MyVertex v = new MyVertex();
+                                    v = objVertex;
+
                                     v.nx += m_Normals[normalIndex - 1].X;
                                     v.ny += m_Normals[normalIndex - 1].Y;
                                     v.nz += m_Normals[normalIndex - 1].Z;
                                     v.u = m_TexCoords[uvIndex - 1].X;
-                                    v.v = m_TexCoords[uvIndex - 1].Y;
-                                    m_Vertices[index] = v;
+                                    v.v = 1.0f - m_TexCoords[uvIndex - 1].Y;
+
+                                    m_Vertices.Add(v);
+                                    m_Indices.Add(m_Vertices.Count-1);
                                 }
                             }
                         }
