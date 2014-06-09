@@ -317,7 +317,7 @@ float4 BlurSSAO(VS_OUTPUT_POSTFX i) : SV_Target
     keyPassThrough = temp.KEY_COMPONENTS;
 #endif
 
-    float key = unpackKey(keyPassThrough);
+    float key = unpackKey(temp.KEY_COMPONENTS);
 
     float sum = temp.VALUE_COMPONENTS;
 
