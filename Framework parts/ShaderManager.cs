@@ -167,7 +167,7 @@ namespace CSharpRenderer
                     if (matchGlobalDefineRegex.Success)
                     {
                         string defineName = matchGlobalDefineRegex.Groups[1].Value;
-                        float value = Single.Parse(matchGlobalDefineRegex.Groups[2].Value);
+                        float value = Single.Parse(matchGlobalDefineRegex.Groups[2].Value, CultureInfo.InvariantCulture);
 
                         if (m_GlobalDefineValues.ContainsKey(defineName))
                         {
