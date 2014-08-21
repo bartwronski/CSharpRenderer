@@ -58,7 +58,7 @@ namespace CSharpRenderer
 
             public void Open(IncludeType type, string fileName, Stream parentStream, out Stream stream)
             {
-                stream = new FileStream(includeDirectory + fileName, FileMode.Open);
+                stream = new FileStream(includeDirectory + fileName, FileMode.Open, FileAccess.Read);
                 m_CurrentlyProcessedShader.m_UsedIncludes.Add(Directory.GetCurrentDirectory() + "\\shaders\\" + fileName);
             }
         }
@@ -71,6 +71,7 @@ namespace CSharpRenderer
         static Dictionary<int, SamplerState> m_SamplerStates;
         static object m_Lock;
         static HashSet<string> m_FilesToReload;
+        static Dictionary<string, float> m_GlobalDefineValues;
 
         // hack for ugly IncludeFX :( 
         static ShaderWrapper m_CurrentlyProcessedShader;
@@ -83,6 +84,7 @@ namespace CSharpRenderer
             public Regex numThreadsRegex;
             public Regex registerRegex;
             public Regex globalBufferRegex;
+            public Regex globalDefineRegex;
 
             public RegexWrapper()
             {
@@ -92,6 +94,7 @@ namespace CSharpRenderer
                 numThreadsRegex = new Regex(@"\[numthreads\((\w+),[ \t]*(\w+),[ \t]*(\w+)\)\]", RegexOptions.IgnoreCase);
                 registerRegex = new Regex(@"register\(b([\d]+)\)", RegexOptions.IgnoreCase);
                 globalBufferRegex = new Regex(@"//[ \t]*Global", RegexOptions.IgnoreCase);
+                globalDefineRegex = new Regex(@"#define[ \t]*(\w+)[ \t]*([\d.f]+)[ \t]*//[ \t]*GlobalDefine", RegexOptions.IgnoreCase);
             }
         };
         static ShaderManager()
@@ -104,10 +107,11 @@ namespace CSharpRenderer
             m_SamplerStates = new Dictionary<int, SamplerState>();
             m_Lock = new Object();
             m_FilesToReload = new HashSet<string>();
-            regexWrapper = new RegexWrapper();
+            m_RegexWrapper = new RegexWrapper();
+            m_GlobalDefineValues = new Dictionary<string, float>();
         }
 
-        static RegexWrapper regexWrapper;
+        static RegexWrapper m_RegexWrapper;
 
         [PermissionSet(SecurityAction.Demand, Name = "FullTrust")]
         static public void Initialize(Device device)
@@ -119,7 +123,7 @@ namespace CSharpRenderer
 
             string[] filters = new[] { "*.hlsl", "*.fx" };
 
-            foreach(string f in filters)
+            foreach (string f in filters)
             {
                 FileSystemWatcher w = new FileSystemWatcher();
                 w.Filter = f;
@@ -130,7 +134,7 @@ namespace CSharpRenderer
                 w.EnableRaisingEvents = true;
                 m_Watchers.Add(w);
             }
-            
+
             m_Initialized = true;
             m_Include = new IncludeFX();
 
@@ -154,15 +158,31 @@ namespace CSharpRenderer
                 while (!sr.EndOfStream)
                 {
                     String line = sr.ReadLine();
-                    Match matchShaderRegex = regexWrapper.shaderRegex.Match(line);
-                    Match matchCbufferRegex = regexWrapper.cbufferRegex.Match(line);
-                    Match matchSamplerRegex = regexWrapper.samplerRegex.Match(line);
-                    Match matchNumThreadsRegex = regexWrapper.numThreadsRegex.Match(line);
+                    Match matchShaderRegex = m_RegexWrapper.shaderRegex.Match(line);
+                    Match matchCbufferRegex = m_RegexWrapper.cbufferRegex.Match(line);
+                    Match matchSamplerRegex = m_RegexWrapper.samplerRegex.Match(line);
+                    Match matchNumThreadsRegex = m_RegexWrapper.numThreadsRegex.Match(line);
+                    Match matchGlobalDefineRegex = m_RegexWrapper.globalDefineRegex.Match(line);
+
+                    if (matchGlobalDefineRegex.Success)
+                    {
+                        string defineName = matchGlobalDefineRegex.Groups[1].Value;
+                        float value = Single.Parse(matchGlobalDefineRegex.Groups[2].Value);
+
+                        if (m_GlobalDefineValues.ContainsKey(defineName))
+                        {
+                            m_GlobalDefineValues[defineName] = value;
+                        }
+                        else
+                        {
+                            m_GlobalDefineValues.Add(defineName, value);
+                        }
+                    }
 
                     if (matchCbufferRegex.Success)
                     {
-                        Match globalBufferMatch = regexWrapper.globalBufferRegex.Match(line);
-                        Match registerMatch = regexWrapper.registerRegex.Match(line);
+                        Match globalBufferMatch = m_RegexWrapper.globalBufferRegex.Match(line);
+                        Match registerMatch = m_RegexWrapper.registerRegex.Match(line);
                         if (!registerMatch.Success)
                         {
                             throw new Exception("Unable to find register for constant buffer");
@@ -286,7 +306,7 @@ namespace CSharpRenderer
                 var shaderFit = localShaders.Where
                 (shader => shader.m_ShaderEntry == registers.Item1);
 
-                foreach(var fittingShader in shaderFit)
+                foreach (var fittingShader in shaderFit)
                 {
                     fittingShader.m_ThreadsX = registers.Item2;
                     fittingShader.m_ThreadsY = registers.Item3;
@@ -306,7 +326,7 @@ namespace CSharpRenderer
 
         public static void BindSamplerStates(DeviceContext context)
         {
-            foreach(var s in m_SamplerStates)
+            foreach (var s in m_SamplerStates)
             {
                 context.PixelShader.SetSampler(s.Value, s.Key);
                 context.VertexShader.SetSampler(s.Value, s.Key);
@@ -322,9 +342,9 @@ namespace CSharpRenderer
             ShaderWrapper wrapper = m_Shaders[shader];
             context.ComputeShader.Set(wrapper.m_ComputeShader);
             context.Dispatch(
-                (textureResource.m_Width + wrapper.m_ThreadsX - 1) / wrapper.m_ThreadsX, 
+                (textureResource.m_Width + wrapper.m_ThreadsX - 1) / wrapper.m_ThreadsX,
                 (textureResource.m_Height + wrapper.m_ThreadsY - 1) / wrapper.m_ThreadsY,
-                (textureResource.m_Depth + wrapper.m_ThreadsZ - 1) / wrapper.m_ThreadsZ );
+                (textureResource.m_Depth + wrapper.m_ThreadsZ - 1) / wrapper.m_ThreadsZ);
         }
 
         public static void ExecuteComputeForSize(DeviceContext context, int x, int y, int z, string shader)
@@ -336,7 +356,23 @@ namespace CSharpRenderer
                 (y + wrapper.m_ThreadsY - 1) / wrapper.m_ThreadsY,
                 (z + wrapper.m_ThreadsZ - 1) / wrapper.m_ThreadsZ);
         }
-        
+
+        public static float GetShaderDefine(string name)
+        {
+            return m_GlobalDefineValues[name];
+        }
+
+        public static uint GetUIntShaderDefine(string name)
+        {
+            float value = m_GlobalDefineValues[name];
+
+            // if someone tried to use it for huge ints or negative values, then we need to find other, less hacky way
+            System.Diagnostics.Debug.Assert((float)((uint)value) == value);
+
+            return (uint)value;
+        }
+
+
         public static List<CustomConstantBufferDefinition> GetConstantBufferDefinitions()
         {
             return m_ConstantBuffers.Values.ToList();
@@ -383,9 +419,9 @@ namespace CSharpRenderer
 
                     done = true;
                 }
-                catch(Exception e)
+                catch (Exception e)
                 {
-                    System.Windows.Forms.MessageBox.Show(e.Message, "Shader compilation error" );
+                    System.Windows.Forms.MessageBox.Show(e.Message, "Shader compilation error");
                 }
             }
             m_CurrentlyProcessedShader = null;
@@ -404,7 +440,7 @@ namespace CSharpRenderer
         {
             bool contains = m_ConstantBuffers.Values.Where
                 (cb => cb.m_FilePath == e.FullPath)
-                .Count() > 0 
+                .Count() > 0
                 ||
                 m_Shaders.Values.Where
                 (shader => shader.m_FilePath == e.FullPath)
@@ -413,17 +449,17 @@ namespace CSharpRenderer
                 (shader => shader.m_UsedIncludes.Contains(e.FullPath));
 
 
-            lock(m_Lock)
+            lock (m_Lock)
             {
-                if(contains)
+                if (contains)
                 {
                     m_FilesToReload.Add(e.FullPath);
                 }
-                m_FilesToReload.UnionWith(shadersUsingInclude.Select( shader => shader.m_FilePath) );
+                m_FilesToReload.UnionWith(shadersUsingInclude.Select(shader => shader.m_FilePath));
             }
-        } 
+        }
 
-        public static void UpdateShaderManager(Device device)
+        public static bool UpdateShaderManager(Device device)
         {
             HashSet<string> filesToReload = new HashSet<string>();
 
@@ -438,13 +474,15 @@ namespace CSharpRenderer
                 ParseFile(device, fileToReload);
             }
 
-            lock(CustomConstantBufferInstance.m_Lock)
+            lock (CustomConstantBufferInstance.m_Lock)
             {
                 foreach (var bufferInstance in CustomConstantBufferInstance.s_AllInstances)
                 {
                     bufferInstance.CreateBufferInstance(bufferInstance.m_Definition, device, false);
                 }
             }
+
+            return filesToReload.Count > 0;
         }
 
         public static VertexShader GetVertexShader(string name)

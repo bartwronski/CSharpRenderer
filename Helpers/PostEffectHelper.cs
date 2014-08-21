@@ -11,6 +11,10 @@ namespace CSharpRenderer
 {
     static class PostEffectHelper
     {
+        public static Buffer m_FullResTriangleGridIndexBuffer;
+        public static Buffer m_ParticleHelperIndexBuffer;
+        public static GPUBufferObject m_RandomNumbersBuffer;
+
         public static void Swap<T>(ref T lhs, ref T rhs)
         {
             T temp;
@@ -28,34 +32,61 @@ namespace CSharpRenderer
         {
             int numQuads = resX * resY;
             int numIndices = numQuads * 6;
+            int numParticlesMax = 1024 * 1024; // million particles max
+            int numIndicesParticles = numParticlesMax * 6;
+            int numRandomNumbers = 1024 * 1024; // million
+
             var indices = new DataStream(sizeof(System.Int32) * numIndices, true, true);
+            var indicesParticles = new DataStream(sizeof(System.Int32) * numIndicesParticles, true, true);
+
+            var randomNumbers = new DataStream(sizeof(System.Single) * numRandomNumbers, true, true);
 
             for (int i = 0; i < numQuads; i++)
             {
-                indices.Write(i*4 + 0);
-                indices.Write(i*4 + 1);
-                indices.Write(i*4 + 2);
+                indices.Write(i * 4 + 0);
+                indices.Write(i * 4 + 1);
+                indices.Write(i * 4 + 2);
 
-                indices.Write(i*4 + 1);
-                indices.Write(i*4 + 3);
-                indices.Write(i*4 + 2);
+                indices.Write(i * 4 + 1);
+                indices.Write(i * 4 + 3);
+                indices.Write(i * 4 + 2);
             }
             indices.Position = 0;
 
+            for (int i = 0; i < numParticlesMax; i++)
+            {
+                indicesParticles.Write(i * 4 + 0);
+                indicesParticles.Write(i * 4 + 1);
+                indicesParticles.Write(i * 4 + 2);
+
+                indicesParticles.Write(i * 4 + 1);
+                indicesParticles.Write(i * 4 + 3);
+                indicesParticles.Write(i * 4 + 2);
+            }
+            indicesParticles.Position = 0;
+
+            System.Random rand = new System.Random();
+
+            for (int i = 0; i < numRandomNumbers; i++)
+            {
+                randomNumbers.Write((float)rand.NextDouble());
+            }
+            randomNumbers.Position = 0;
+
             // create the vertex layout and buffer
             m_FullResTriangleGridIndexBuffer = new Buffer(device, indices, sizeof(System.Int32) * numIndices, ResourceUsage.Default, BindFlags.IndexBuffer, CpuAccessFlags.None, ResourceOptionFlags.None, 0);
-        
+            m_ParticleHelperIndexBuffer = new Buffer(device, indicesParticles, sizeof(System.Int32) * numIndicesParticles, ResourceUsage.Default, BindFlags.IndexBuffer, CpuAccessFlags.None, ResourceOptionFlags.None, 0);
+            m_RandomNumbersBuffer = GPUBufferObject.CreateBuffer(device, numRandomNumbers, 4, randomNumbers, true, false);
+
         }
 
-        static Buffer m_FullResTriangleGridIndexBuffer;
-        
-        public static void RenderFullscreenTriangle(DeviceContext context, string pixelShader)
+        public static void RenderFullscreenTriangle(DeviceContext context, string pixelShader, bool maxZ = false)
         {
             context.InputAssembler.InputLayout = null;
             context.InputAssembler.PrimitiveTopology = PrimitiveTopology.TriangleList;
             context.InputAssembler.SetVertexBuffers(0, new VertexBufferBinding());
             context.InputAssembler.SetIndexBuffer(null, Format.Unknown, 0);
-            context.VertexShader.Set(ShaderManager.GetVertexShader("VertexFullScreenTriangle"));
+            context.VertexShader.Set(maxZ ? ShaderManager.GetVertexShader("VertexFullScreenTriangleMaxZ") : ShaderManager.GetVertexShader("VertexFullScreenTriangle"));
             context.PixelShader.Set(ShaderManager.GetPixelShader(pixelShader));
             context.Draw(3, 0);
         }
@@ -92,6 +123,6 @@ namespace CSharpRenderer
                 ContextHelper.ClearSRVs(context);
             }
         }
-    
+
     }
 }

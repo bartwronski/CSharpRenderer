@@ -36,7 +36,7 @@ namespace CSharpRenderer
             Random rand = new Random();
 
             dynamic scb = m_SSAOBuffer;
-            scb.SSAOPhase = (float)rand.NextDouble() * 3.1415f;
+            scb.g_SSAOPhase = (float)rand.NextDouble() * 3.1415f;
             m_SSAOBuffer.CompileAndBind(context);
 
             using (new GpuProfilePoint(context, "SSAO"))

@@ -18,9 +18,12 @@ namespace CSharpRenderer
         struct TexWrapper
         {
             public String name;
-            public String textureName;
-            public Texture2D textureObject;
-            public ShaderResourceView textureSrv;
+            public String textureNameDiffuse;
+            public String textureNameBump;
+            public Texture2D textureObjectDiffuse;
+            public Texture2D textureObjectBump;
+            public ShaderResourceView textureSrvDiffuse;
+            public ShaderResourceView textureSrvBump;
         };
 
         ObjFileLoader m_ObjectLoader;
@@ -47,39 +50,33 @@ namespace CSharpRenderer
             foreach (var v in m_ObjectLoader.m_MatTexMappingDiffuse)
             {
                 TexWrapper tex = new TexWrapper();
-                bool found = false;
+                tex.name = v.Key;
+                tex.textureNameDiffuse = v.Value;
 
-                foreach (var t in m_MaterialsResources)
+                // try to find bump texture or revert to default
+                string bumpTexName = "textures\\default_n.dds";
+                if (m_ObjectLoader.m_MatTexMappingNormalMap.ContainsKey(v.Key))
                 {
-                    if (t.textureName == v.Value)
-                    {
-                        tex.name = v.Key;
-                        tex.textureName = v.Value;
-                        tex.textureObject = t.textureObject;
-                        tex.textureSrv = t.textureSrv;
-
-                        found = true;
-                        break;
-                    }
+                    bumpTexName = m_ObjectLoader.m_MatTexMappingNormalMap[v.Key];
                 }
+                tex.textureNameBump = bumpTexName;
 
-                if (!found)
+                try
                 {
-                    tex.name = v.Key;
-                    tex.textureName = v.Value;
+                    tex.textureObjectDiffuse = Texture2D.FromFile(device, v.Value);
+                    tex.textureSrvDiffuse = new ShaderResourceView(device, tex.textureObjectDiffuse);
 
-                    try
-                    {
-                        tex.textureObject = Texture2D.FromFile(device, v.Value);
-                        tex.textureSrv = new ShaderResourceView(device, tex.textureObject);
-                    }
-                    catch
-                    {
-                        tex.textureObject = null;
-                        tex.textureSrv = null;
-                    }
+                    tex.textureObjectBump = Texture2D.FromFile(device, tex.textureNameBump);
+                    tex.textureSrvBump = new ShaderResourceView(device, tex.textureObjectBump);
+
                 }
-
+                catch
+                {
+                    tex.textureObjectDiffuse = null;
+                    tex.textureSrvDiffuse = null;
+                    tex.textureObjectBump = null;
+                    tex.textureSrvBump = null;
+                }
                 m_MaterialsResources[counter++] = tex;
             }
 
@@ -144,9 +141,10 @@ namespace CSharpRenderer
                 String matName = m_ObjectLoader.m_Materials[i];
                 foreach (var t in m_MaterialsResources)
                 {
-                    if (t.name == matName && t.textureSrv != null)
+                    if (t.name == matName && t.textureSrvDiffuse != null)
                     {
-                        context.PixelShader.SetShaderResource(t.textureSrv, 4);
+                        context.PixelShader.SetShaderResource(t.textureSrvDiffuse, 4);
+                        context.PixelShader.SetShaderResource(t.textureSrvBump, 9);
                         break;
                     }
                 }

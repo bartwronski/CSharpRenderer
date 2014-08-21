@@ -43,6 +43,11 @@ namespace CSharpRenderer
                 PostEffectHelper.RenderFullscreenTriangle(context, accumulateHistory ? "ResolveTemporalHistoryAccumulation" : "ResolveTemporalMotionBased");
                 RenderTargetSet.BindNull(context);
                 ContextHelper.ClearSRVs(context);
+
+                if (accumulateHistory)
+                {
+                    PostEffectHelper.Copy(context, sourceCurrent, target);
+                }
             }
         }
     }

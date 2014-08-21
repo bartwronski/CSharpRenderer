@@ -18,13 +18,13 @@ float4 ResolveTemporalMotionBased(VS_OUTPUT_POSTFX i) : SV_Target
 
     float2 motionVectorDiff = motionVector - motionVectorPrevFrame;
     
-    // magic number, works of in high fps, 50+
-    float weightCoeff = 256.0f;
+    // magic number, works well in high fps, 50+
+    float weightCoeff = 512.0f;
     float weight = saturate(dot(abs(motionVectorDiff), weightCoeff));
     
 #ifdef HISTORY_ACCUMULATION
-    // magic number, works of in high fps, 50+
-    float finalWeight = saturate(0.1f + weight);
+    // magic number, works well in high fps, 50+
+    float finalWeight = saturate(0.25f + weight);
 #else
     float finalWeight = 0.5f + 0.5f * weight;
 #endif

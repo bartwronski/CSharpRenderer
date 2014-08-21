@@ -48,7 +48,7 @@ namespace CSharpRenderer
             m_Materials = new List<String>();
             m_MatTexMappingDiffuse = new Dictionary<String, String>();
             m_MatTexMappingNormalMap = new Dictionary<String, String>();
-            m_BoundingBoxMin = new Vector3(float.MaxValue,float.MaxValue,float.MaxValue);
+            m_BoundingBoxMin = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
             m_BoundingBoxMax = new Vector3(float.MinValue, float.MinValue, float.MinValue);
         }
 
@@ -140,7 +140,7 @@ namespace CSharpRenderer
                             continue;
                         }
 
-                        if (line.Length < 1 )
+                        if (line.Length < 1)
                         {
                             continue;
                         }
@@ -149,7 +149,7 @@ namespace CSharpRenderer
                         {
                             var tokens = line.Split(new String[] { " " }, StringSplitOptions.RemoveEmptyEntries);
 
-                            if ( m_Materials.Count == 0 || m_Materials[m_Materials.Count-1] != tokens[1] )
+                            if (m_Materials.Count == 0 || m_Materials[m_Materials.Count - 1] != tokens[1])
                             {
                                 if (m_Indices.Count > 0)
                                 {
@@ -160,9 +160,9 @@ namespace CSharpRenderer
                             }
                         }
 
-                        if ( line.StartsWith("v ") )
+                        if (line.StartsWith("v "))
                         {
-                            var tokens = line.Split(new String[] { " " }, StringSplitOptions.RemoveEmptyEntries );
+                            var tokens = line.Split(new String[] { " " }, StringSplitOptions.RemoveEmptyEntries);
                             MyVertex v = new MyVertex();
                             v.x = Convert.ToSingle(tokens[1], ci) / 100.0f;
                             v.y = Convert.ToSingle(tokens[2], ci) / 100.0f;
@@ -195,10 +195,10 @@ namespace CSharpRenderer
                         if (line.StartsWith("f "))
                         {
                             var tokens = line.Split(new String[] { " " }, StringSplitOptions.RemoveEmptyEntries);
-                            
-                            if ( tokens.Length > 4 )
+
+                            if (tokens.Length > 4)
                             {
-                                Int32[] tmpArray = new Int32[tokens.Length-1];
+                                Int32[] tmpArray = new Int32[tokens.Length - 1];
                                 for (int i = 0; i < tokens.Length - 1; ++i)
                                 {
                                     var splitTokens = tokens[i + 1].Split(new String[] { "/" }, StringSplitOptions.RemoveEmptyEntries);
@@ -222,12 +222,12 @@ namespace CSharpRenderer
                                     tmpArray[i] = m_Vertices.Count;
                                 }
 
-                                m_Indices.Add(tmpArray[0]-1);
-                                m_Indices.Add(tmpArray[1]-1);
-                                m_Indices.Add(tmpArray[2]-1);
-                                m_Indices.Add(tmpArray[2]-1);
-                                m_Indices.Add(tmpArray[3]-1);
-                                m_Indices.Add(tmpArray[0]-1);
+                                m_Indices.Add(tmpArray[0] - 1);
+                                m_Indices.Add(tmpArray[1] - 1);
+                                m_Indices.Add(tmpArray[2] - 1);
+                                m_Indices.Add(tmpArray[2] - 1);
+                                m_Indices.Add(tmpArray[3] - 1);
+                                m_Indices.Add(tmpArray[0] - 1);
                             }
                             else
                             {
@@ -250,7 +250,7 @@ namespace CSharpRenderer
                                     v.v = 1.0f - m_TexCoords[uvIndex - 1].Y;
 
                                     m_Vertices.Add(v);
-                                    m_Indices.Add(m_Vertices.Count-1);
+                                    m_Indices.Add(m_Vertices.Count - 1);
                                 }
                             }
                         }
@@ -262,7 +262,7 @@ namespace CSharpRenderer
 
                 }
 
-                for(int i = 0; i < m_Vertices.Count; ++i )
+                for (int i = 0; i < m_Vertices.Count; ++i)
                 {
                     MyVertex vertexCopy = m_Vertices[i];
                     Vector3 normal = new Vector3(vertexCopy.nx, vertexCopy.ny, vertexCopy.nz);
@@ -273,8 +273,8 @@ namespace CSharpRenderer
 
                     m_Vertices[i] = vertexCopy;
                 }
-                
-            
+
+
             }
             catch (IOException e)
             {

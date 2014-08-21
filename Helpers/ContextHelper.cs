@@ -19,8 +19,6 @@ namespace CSharpRenderer
             Additive,
         }
 
-        static BlendState[] m_BlendStates;
-
         // todo
         public enum DepthConfigurationType
         {
@@ -29,16 +27,27 @@ namespace CSharpRenderer
             DepthCompare,
         }
 
+        // todo
+        public enum RasterizerStateType
+        {
+            CullBack,
+            CullFront,
+            CullNone,
+        }
+
         static DepthStencilState[] m_DepthStencilStates;
-        
+        static BlendState[] m_BlendStates;
+        static RasterizerState[] m_RasterizerStates;
+
         static ContextHelper()
         {
             m_BlendStates = new BlendState[Enum.GetNames(typeof(BlendType)).Length];
             m_DepthStencilStates = new DepthStencilState[Enum.GetNames(typeof(DepthConfigurationType)).Length];
+            m_RasterizerStates = new RasterizerState[Enum.GetNames(typeof(RasterizerStateType)).Length];
         }
 
 
-        public static void ClearCSContext( DeviceContext context )
+        public static void ClearCSContext(DeviceContext context)
         {
             context.ComputeShader.SetUnorderedAccessView(null, 0);
             context.ComputeShader.SetUnorderedAccessView(null, 1);
@@ -75,7 +84,7 @@ namespace CSharpRenderer
 
         public static void ClearSRVs(DeviceContext context)
         {
-            for (int i = 0; i < 16; ++i )
+            for (int i = 0; i < 16; ++i)
             {
                 context.PixelShader.SetShaderResource(null, 0);
                 context.VertexShader.SetShaderResource(null, 0);
@@ -117,6 +126,7 @@ namespace CSharpRenderer
                 depthStencilStateDescription.DepthWriteMask = DepthWriteMask.Zero;
                 depthStencilStateDescription.IsDepthEnabled = false;
                 depthStencilStateDescription.IsStencilEnabled = false;
+                depthStencilStateDescription.DepthWriteMask = DepthWriteMask.Zero;
 
                 m_DepthStencilStates[(int)DepthConfigurationType.NoDepth] = DepthStencilState.FromDescription(device, depthStencilStateDescription);
 
@@ -131,6 +141,26 @@ namespace CSharpRenderer
                 m_DepthStencilStates[(int)DepthConfigurationType.DepthCompare] = DepthStencilState.FromDescription(device, depthStencilStateDescription);
             }
 
+            {
+                var rasterizerStateDescription = new RasterizerStateDescription();
+                rasterizerStateDescription.DepthBias = 0;
+                rasterizerStateDescription.DepthBiasClamp = 0;
+                rasterizerStateDescription.FillMode = FillMode.Solid;
+                rasterizerStateDescription.IsAntialiasedLineEnabled = false;
+                rasterizerStateDescription.IsDepthClipEnabled = true;
+                rasterizerStateDescription.IsMultisampleEnabled = false;
+                rasterizerStateDescription.IsScissorEnabled = false;
+                rasterizerStateDescription.SlopeScaledDepthBias = 0;
+                rasterizerStateDescription.CullMode = CullMode.None;
+                m_RasterizerStates[(int)RasterizerStateType.CullNone] = RasterizerState.FromDescription(device, rasterizerStateDescription);
+
+                rasterizerStateDescription.CullMode = CullMode.Front;
+                m_RasterizerStates[(int)RasterizerStateType.CullFront] = RasterizerState.FromDescription(device, rasterizerStateDescription);
+
+                rasterizerStateDescription.CullMode = CullMode.Back;
+                m_RasterizerStates[(int)RasterizerStateType.CullBack] = RasterizerState.FromDescription(device, rasterizerStateDescription);
+            }
+
         }
 
         public static void SetBlendState(DeviceContext context, BlendType type)
@@ -141,6 +171,11 @@ namespace CSharpRenderer
         public static void SetDepthStencilState(DeviceContext context, DepthConfigurationType type)
         {
             context.OutputMerger.DepthStencilState = m_DepthStencilStates[(int)type];
+        }
+
+        public static void SetRasterizerState(DeviceContext context, RasterizerStateType type)
+        {
+            context.Rasterizer.State = m_RasterizerStates[(int)type];
         }
     }
 }

@@ -8,8 +8,8 @@ static const float2 exponents = float2(positiveExponent, negativeExponent);
 
 float2 warpDepth(float depth)
 {
-    depth = 2.0f * depth - 1.0f;
     float pos = exp(exponents.x * depth);
+    depth = 2.0f * depth - 1.0f;
     float neg = -exp(-exponents.y * depth);
     return float2(pos, neg);
 }

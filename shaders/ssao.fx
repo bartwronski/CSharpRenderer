@@ -11,7 +11,7 @@ Texture2D<float2> InputTextureMotion            : register(t2);
 cbuffer SSAOBuffer : register(b7)
 {
     /// Phase
-    float       SSAOPhase;
+    float       g_SSAOPhase;
 }
 
 /*
@@ -89,7 +89,7 @@ was placed!]
 */
 float3 reconstructCSPosition(float2 S, float z)
 {
-    return float3((S * reprojectInfoFromInt.xy + reprojectInfoFromInt.zw)*z, z);
+    return float3((S * g_ReprojectInfoFromInt.xy + g_ReprojectInfoFromInt.zw)*z, z);
 }
 
 /** Reconstructs screen-space unit normal from screen-space position */
@@ -205,7 +205,7 @@ float4 SSAOCalculate(VS_OUTPUT_POSTFX i) : SV_Target
     float zKey = CSZToKey(C.z);
     packKey(zKey, bilateralKey);
 
-    bool earlyOut = C.z > FAR_PLANE_Z || C.z < 0.4f || any(ssC < 8) || any(ssC >= (screenSize.xy - 8));
+    bool earlyOut = C.z > FAR_PLANE_Z || C.z < 0.4f || any(ssC < 8) || any(ssC >= (g_ScreenSize.xy - 8));
     [branch]
     if(earlyOut)
     {
@@ -218,7 +218,7 @@ float4 SSAOCalculate(VS_OUTPUT_POSTFX i) : SV_Target
     float aoPrevFrame = prevFrame.r;
 
     // Hash function used in the HPG12 AlchemyAO paper
-    float randomPatternRotationAngle = (3 * ssC.x ^ ssC.y + ssC.x * ssC.y) * 10 + SSAOPhase;
+    float randomPatternRotationAngle = (3 * ssC.x ^ ssC.y + ssC.x * ssC.y) * 10 + g_SSAOPhase;
 
     // Reconstruct normals from positions. These will lead to 1-pixel black lines
     // at depth discontinuities, however the blur will wipe those out so they are not visible
@@ -250,7 +250,7 @@ float4 SSAOCalculate(VS_OUTPUT_POSTFX i) : SV_Target
     {
 		A -= ddy_fine(A) * ((ssC.y & 1) - 0.5);
 	}
-    visibility = A;
+    visibility = lerp(A, 1.0f, 1.0f - saturate(0.5f * C.z)); // this algorithm has problems with near surfaces... lerp it out smoothly
 
     float difference = saturate(1.0f - 200*abs(zKey-keyPrevFrame));
     visibility = lerp(visibility, aoPrevFrame, 0.95f*difference);

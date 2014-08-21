@@ -21,20 +21,25 @@ namespace CSharpRenderer
         public ShaderResourceView m_ShaderResourceView;
         public UnorderedAccessView m_UnorderedAccessView;
 
+        public Buffer m_StagingBufferObject;
+        public Buffer m_StagingCountBufferObject;
+
         // my stuff
         public int m_Size;
 
         // Functions
         public GPUBufferObject()
         {
-            m_Size = 1;
+            m_Size = -1;
             m_BufferObject = null;
             m_ShaderResourceView = null;
             m_UnorderedAccessView = null;
+            m_StagingBufferObject = null;
+            m_StagingCountBufferObject = null;
         }
 
         // Static functions
-        static public GPUBufferObject CreateBuffer(Device device, int size)
+        static public GPUBufferObject CreateBuffer(Device device, int size, int elementSizeInBytes, DataStream stream = null, bool append = false, bool allowStaging = false)
         {
             GPUBufferObject newBuffer = new GPUBufferObject();
 
@@ -43,21 +48,17 @@ namespace CSharpRenderer
 
             BindFlags bindFlags = BindFlags.ShaderResource | BindFlags.UnorderedAccess;
 
-            BufferDescription description = new BufferDescription(size * 4, ResourceUsage.Default, bindFlags, CpuAccessFlags.None, ResourceOptionFlags.StructuredBuffer, 4);
+            BufferDescription description = new BufferDescription(size * elementSizeInBytes, ResourceUsage.Default, bindFlags, CpuAccessFlags.None, ResourceOptionFlags.StructuredBuffer, elementSizeInBytes);
 
-            newBuffer.m_BufferObject = new Buffer(device, description);
+            newBuffer.m_BufferObject = stream != null ? new Buffer(device, stream, description) : new Buffer(device, description);
 
             ShaderResourceViewDescription srvViewDesc = new ShaderResourceViewDescription
             {
-                ArraySize = 0,
+                FirstElement = 0,
                 ElementCount = size,
-                ElementWidth = size,
                 Format = Format.Unknown,
-                Dimension = ShaderResourceViewDimension.Buffer,
+                Dimension = ShaderResourceViewDimension.ExtendedBuffer,
                 Flags = 0,
-                FirstArraySlice = 0,
-                MostDetailedMip = 0,
-                MipLevels = 0
             };
 
             newBuffer.m_ShaderResourceView = new ShaderResourceView(device, newBuffer.m_BufferObject, srvViewDesc);
@@ -68,13 +69,43 @@ namespace CSharpRenderer
                 ArraySize = 0,
                 Dimension = UnorderedAccessViewDimension.Buffer,
                 ElementCount = size,
-                Flags = UnorderedAccessViewBufferFlags.None,
+                Flags = append ? UnorderedAccessViewBufferFlags.AllowAppend : UnorderedAccessViewBufferFlags.None,
                 Format = Format.Unknown,
                 MipSlice = 0
             };
             newBuffer.m_UnorderedAccessView = new UnorderedAccessView(device, newBuffer.m_BufferObject, uavDesc);
 
+            if (allowStaging)
+            {
+                description = new BufferDescription(size * elementSizeInBytes, ResourceUsage.Staging, BindFlags.None, CpuAccessFlags.Read, ResourceOptionFlags.StructuredBuffer, elementSizeInBytes);
+                newBuffer.m_StagingBufferObject = new Buffer(device, description);
+
+                description = new BufferDescription(16, ResourceUsage.Staging, BindFlags.None, CpuAccessFlags.Read, ResourceOptionFlags.None, 4);
+                newBuffer.m_StagingCountBufferObject = new Buffer(device, description);
+            }
+
             return newBuffer;
+        }
+
+        public int GetAppendStructureCount(DeviceContext context)
+        {
+            context.CopyStructureCount(m_UnorderedAccessView, m_StagingCountBufferObject, 0);
+            DataBox box = context.MapSubresource(m_StagingCountBufferObject, MapMode.Read, SlimDX.Direct3D11.MapFlags.None);
+            int result = box.Data.Read<int>();
+            context.UnmapSubresource(m_StagingCountBufferObject, 0);
+
+            return result;
+        }
+
+        public DataBox LockBuffer(DeviceContext context)
+        {
+            context.CopyResource(m_BufferObject, m_StagingBufferObject);
+            return context.MapSubresource(m_StagingBufferObject, MapMode.Read, SlimDX.Direct3D11.MapFlags.None);
+        }
+
+        public void UnlockBuffer(DeviceContext context)
+        {
+            context.UnmapSubresource(m_StagingBufferObject, 0);
         }
     }
 }

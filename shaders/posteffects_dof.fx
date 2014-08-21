@@ -35,8 +35,8 @@ VS_OUTPUT_BOKEH VShader(uint id : SV_VERTEXID)
     uint quadIndex = id / 4;
     uint vertexIndex = id % 4;
 
-    float screenWidth = screenSizeHalfRes.x;
-    float screenWidthRcp = screenSizeHalfRes.z;
+    float screenWidth = g_ScreenSizeHalfRes.x;
+    float screenWidthRcp = g_ScreenSizeHalfRes.z;
 
     float quadIndexAsFloat = quadIndex;
 
@@ -67,7 +67,7 @@ VS_OUTPUT_BOKEH VShader(uint id : SV_VERTEXID)
     position2D += float2(pixelX, pixelY);
 
     // "texture space" coords
-    position2D *= screenSizeHalfRes.zw;
+    position2D *= g_ScreenSizeHalfRes.zw;
 
     // screen space coords, near goes right, far goes left
     position2D = position2D * float2(1.0f, -2.0f) + float2(near, 1.0f);

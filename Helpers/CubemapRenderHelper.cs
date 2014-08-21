@@ -73,9 +73,9 @@ namespace CSharpRenderer
 
                     Matrix viewMatrix = Matrix.LookAtLH(position, position + lookAt, upVec);
 
-                    cvpb.projMatrix = projectionMatrix;
-                    cvpb.viewMatrix = viewMatrix;
-                    cvpb.viewProjMatrix = viewMatrix * projectionMatrix;
+                    cvpb.g_ProjMatrix = projectionMatrix;
+                    cvpb.g_ViewMatrix = viewMatrix;
+                    cvpb.g_ViewProjMatrix = viewMatrix * projectionMatrix;
 
                     {
                         context.ClearRenderTargetView(targetTexture.m_ArrayRenderTargetViews[i], clearColor);

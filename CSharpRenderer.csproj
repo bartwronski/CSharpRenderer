@@ -86,9 +86,11 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Algorithms\GeometricsAlgorithms.cs" />
     <Compile Include="Algorithms\GlobalIllumination.cs" />
     <Compile Include="Framework parts\RenderTargetManager.cs" />
     <Compile Include="Helpers\CubemapRenderHelper.cs" />
+    <Compile Include="Helpers\PerlinNoiseHelper.cs" />
     <Compile Include="Helpers\PostEffectHelper.cs" />
     <Compile Include="PostEffects\FXAA.cs" />
     <Compile Include="PostEffects\LuminanceCalculation.cs" />
@@ -97,6 +99,7 @@
     <Compile Include="PostEffects\Temporal.cs" />
     <Compile Include="PostEffects\ScatterDOF.cs" />
     <Compile Include="Render passes\ShadowEVSMGenerator.cs" />
+    <Compile Include="Render passes\VolumetricFog.cs" />
     <Compile Include="Scene management\Camera.cs" />
     <Compile Include="Low level\ConstantBuffer.cs" />
     <Compile Include="Helpers\ContextHelper.cs" />
@@ -141,6 +144,28 @@
       <DependentUpon>Settings.settings</DependentUpon>
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
     </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Shaders\compute.fx" />
+    <Content Include="Shaders\constants.fx" />
+    <Content Include="Shaders\derivative_mapping_inc.fx" />
+    <Content Include="Shaders\evsm.fx" />
+    <Content Include="Shaders\evsm_inc.fx" />
+    <Content Include="Shaders\FXAA.hlsl" />
+    <Content Include="Shaders\generate_perlin_textures.fx" />
+    <Content Include="Shaders\global_illumination_gen.fx" />
+    <Content Include="Shaders\mesh_rendering.fx" />
+    <Content Include="Shaders\optimized-ggx.hlsl" />
+    <Content Include="Shaders\particle_rendering.fx" />
+    <Content Include="Shaders\perlin_noise_inc.fx" />
+    <Content Include="Shaders\posteffects_dof.fx" />
+    <Content Include="Shaders\posteffects_temporal.fx" />
+    <Content Include="Shaders\posteffect_helpers.fx" />
+    <Content Include="Shaders\sampler_states.fx" />
+    <Content Include="Shaders\shader_fast_math.fx" />
+    <Content Include="Shaders\ssao.fx" />
+    <Content Include="Shaders\volumetric_fog.fx" />
+    <Content Include="Shaders\volumetric_fog_inc.fx" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

@@ -29,7 +29,7 @@ struct OutputSH
 cbuffer GIConstantBuffer : register(b8)
 {
     /// Position
-    float4       InjectPosition;
+    float4       g_InjectPosition;
 }
 
 static const float fSize = 128.0f;
@@ -79,7 +79,7 @@ float4 EvaluateDirSH(float x, float y, int face)
     }
 
     float3 dir = normalize(float3(ix, iy, iz));
-    float4 sh = SH2DirectionResponse(dir);
+    float4 sh = SH2CosineResponse(dir) / PI; // wrap cosine lighting to avoid negative lobe
 
     return sh;
 }
@@ -147,9 +147,9 @@ void InjectSHIntoVolume(uint2 dispatchThreadID : SV_DispatchThreadID, uint2 grou
         origSHG *= 1.0f / 64.0f;
         origSHB *= 1.0f / 64.0f;
 
-        OutputTextureR[uint3(InjectPosition.xyz)] = origSHR;
-        OutputTextureG[uint3(InjectPosition.xyz)] = origSHG;
-        OutputTextureB[uint3(InjectPosition.xyz)] = origSHB;
+        OutputTextureR[uint3(g_InjectPosition.xyz)] = origSHR;
+        OutputTextureG[uint3(g_InjectPosition.xyz)] = origSHG;
+        OutputTextureB[uint3(g_InjectPosition.xyz)] = origSHB;
     }
 }
 

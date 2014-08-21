@@ -1,4 +1,5 @@
 // VertexShader: VertexFullScreenTriangle, entry: VShader
+// VertexShader: VertexFullScreenTriangleMaxZ, entry: VShader, defines: MAX_Z
 // PixelShader:  PixelTest, entry: PShader
 // PixelShader:  ResolveHDR, entry: ResolvePS
 // PixelShader:  Copy, entry: PShaderCopy
@@ -23,7 +24,11 @@ VS_OUTPUT_POSTFX VShader(uint id : SV_VERTEXID)
     VS_OUTPUT_POSTFX vo;
     vo.position.x = (float)(id / 2) * 4.0f - 1.0f;
     vo.position.y = (float)(id % 2) * 4.0f - 1.0f;
+#ifdef MAX_Z
+    vo.position.z = 1.0f;
+#else
     vo.position.z = 0.0f;
+#endif
     vo.position.w = 1.0f;
 
     vo.uv.x = (float)(id / 2) * 2.0f;
@@ -78,11 +83,12 @@ float4 ResolveMotionVectors(VS_OUTPUT_POSTFX i) : SV_Target
 {
     float textureSampleDepth = InputTexture.SampleLevel(pointSampler, i.uv, 0).r;
     float2 screenPos = float2(i.uv * float2(2,-2) + float2(-1,1) );
-    float4 invCoords = mul( invViewProjMatrix, float4(screenPos, textureSampleDepth, 1.0f) ); 
+    float4 invCoords = mul( g_InvViewProjMatrix, float4(screenPos, textureSampleDepth, 1.0f) ); 
 
     //float3 worldPos = invCoords.xyz / invCoords.www;
 
-    float4 coordsPrevFrame = mul(viewProjMatrixPrevFrame, invCoords);
+    // TODO: compose matrices together
+    float4 coordsPrevFrame = mul(g_ViewProjMatrixPrevFrame, invCoords);
     coordsPrevFrame /= coordsPrevFrame.wwww;
     float2 uvMotionVector = coordsPrevFrame.xy - screenPos;
     uvMotionVector = uvMotionVector * float2(0.5f,-0.5f);
@@ -175,5 +181,5 @@ float4 FxaaPS(VS_OUTPUT_POSTFX Input) : SV_TARGET
 {
     FxaaTex tex = { anisoSampler, InputTexture };
     return float4(FxaaPixelShader(
-        Input.uv.xy, tex, screenSize.zw), 1.0f);
+        Input.uv.xy, tex, g_ScreenSize.zw), 1.0f);
 }

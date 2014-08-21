@@ -28,9 +28,9 @@ namespace CSharpRenderer
         RenderTargetSet                 m_Downsampled4x4SHSetG;
         RenderTargetSet                 m_Downsampled4x4SHSetB;
 
-        public const int VolumeSizeX = 64;
-        public const int VolumeSizeY = 32;
-        public const int VolumeSizeZ = 64;
+        public int m_VolumeSizeX;
+        public int m_VolumeSizeY;
+        public int m_VolumeSizeZ;
 
         Vector3 m_SceneBoundsMin;
         Vector3 m_SceneBoundsMax;
@@ -39,20 +39,24 @@ namespace CSharpRenderer
 
         public GlobalIlluminationRenderer(Device device, Vector3 sceneBoundsMin, Vector3 sceneBoundsMax)
         {
+            m_VolumeSizeX = (int)ShaderManager.GetUIntShaderDefine("GI_VOLUME_RESOLUTION_X");
+            m_VolumeSizeY = (int)ShaderManager.GetUIntShaderDefine("GI_VOLUME_RESOLUTION_Y");
+            m_VolumeSizeZ = (int)ShaderManager.GetUIntShaderDefine("GI_VOLUME_RESOLUTION_Z");
+
             m_CubeObject      = TextureObject.CreateCubeTexture(device, 128, 128, 1, Format.R16G16B16A16_Float, false, true);
             m_CubeObjectDepth = TextureObject.CreateCubeTexture(device, 128, 128, 1, Format.R32_Typeless, true, true);
 
             if (System.IO.File.Exists("textures\\givolumer.dds"))
             {
-                m_GIVolumeR = TextureObject.CreateTexture3DFromFile(device, VolumeSizeX, VolumeSizeY, VolumeSizeZ, Format.R16G16B16A16_Float, "textures\\givolumer.dds");
-                m_GIVolumeG = TextureObject.CreateTexture3DFromFile(device, VolumeSizeX, VolumeSizeY, VolumeSizeZ, Format.R16G16B16A16_Float, "textures\\givolumeg.dds");
-                m_GIVolumeB = TextureObject.CreateTexture3DFromFile(device, VolumeSizeX, VolumeSizeY, VolumeSizeZ, Format.R16G16B16A16_Float, "textures\\givolumeb.dds");
+                m_GIVolumeR = TextureObject.CreateTexture3DFromFile(device, m_VolumeSizeX, m_VolumeSizeY, m_VolumeSizeZ, Format.R16G16B16A16_Float, "textures\\givolumer.dds");
+                m_GIVolumeG = TextureObject.CreateTexture3DFromFile(device, m_VolumeSizeX, m_VolumeSizeY, m_VolumeSizeZ, Format.R16G16B16A16_Float, "textures\\givolumeg.dds");
+                m_GIVolumeB = TextureObject.CreateTexture3DFromFile(device, m_VolumeSizeX, m_VolumeSizeY, m_VolumeSizeZ, Format.R16G16B16A16_Float, "textures\\givolumeb.dds");
             }
             else
             {
-                m_GIVolumeR = TextureObject.CreateTexture3D(device, VolumeSizeX, VolumeSizeY, VolumeSizeZ, Format.R16G16B16A16_Float);
-                m_GIVolumeG = TextureObject.CreateTexture3D(device, VolumeSizeX, VolumeSizeY, VolumeSizeZ, Format.R16G16B16A16_Float);
-                m_GIVolumeB = TextureObject.CreateTexture3D(device, VolumeSizeX, VolumeSizeY, VolumeSizeZ, Format.R16G16B16A16_Float);
+                m_GIVolumeR = TextureObject.CreateTexture3D(device, m_VolumeSizeX, m_VolumeSizeY, m_VolumeSizeZ, Format.R16G16B16A16_Float);
+                m_GIVolumeG = TextureObject.CreateTexture3D(device, m_VolumeSizeX, m_VolumeSizeY, m_VolumeSizeZ, Format.R16G16B16A16_Float);
+                m_GIVolumeB = TextureObject.CreateTexture3D(device, m_VolumeSizeX, m_VolumeSizeY, m_VolumeSizeZ, Format.R16G16B16A16_Float);
             }
             
 
@@ -99,17 +103,17 @@ namespace CSharpRenderer
             for (int i = 0; i < 128; ++i)
             {
                 Vector3 capturePosition = 
-                    new Vector3((float)m_CurrentCellX / ((float)GlobalIlluminationRenderer.VolumeSizeX) * bounds.X + min.X, 
-                                (float)m_CurrentCellY / ((float)GlobalIlluminationRenderer.VolumeSizeY) * bounds.Y + min.Y, 
-                                (float)m_CurrentCellZ / ((float)GlobalIlluminationRenderer.VolumeSizeZ) * bounds.Z + min.Z);
+                    new Vector3((float)m_CurrentCellX / ((float)m_VolumeSizeX) * bounds.X + min.X, 
+                                (float)m_CurrentCellY / ((float)m_VolumeSizeY) * bounds.Y + min.Y, 
+                                (float)m_CurrentCellZ / ((float)m_VolumeSizeZ) * bounds.Z + min.Z);
 
-                if (++m_CurrentCellX >= GlobalIlluminationRenderer.VolumeSizeX)
+                if (++m_CurrentCellX >= m_VolumeSizeX)
                 {
                     m_CurrentCellX = 0;
-                    if (++m_CurrentCellZ >= GlobalIlluminationRenderer.VolumeSizeZ)
+                    if (++m_CurrentCellZ >= m_VolumeSizeZ)
                     {
                         m_CurrentCellZ = 0;
-                        if (++m_CurrentCellY >= GlobalIlluminationRenderer.VolumeSizeY)
+                        if (++m_CurrentCellY >= m_VolumeSizeY)
                         {
                             Texture3D.SaveTextureToFile(context, m_GIVolumeR.m_TextureObject3D, ImageFileFormat.Dds, "textures\\givolumer.dds");
                             Texture3D.SaveTextureToFile(context, m_GIVolumeG.m_TextureObject3D, ImageFileFormat.Dds, "textures\\givolumeg.dds");
@@ -166,7 +170,7 @@ namespace CSharpRenderer
                 positionInVolume.Y = positionInVolume.Y / (sceneMax.Y - sceneMin.Y);
                 positionInVolume.Z = positionInVolume.Z / (sceneMax.Z - sceneMin.Z);
                 dynamic scb = m_GIConstantBuffer;
-                scb.InjectPosition = new Vector4(new Vector3(positionInVolume.X * (float)(VolumeSizeX - 1), positionInVolume.Y * (float)(VolumeSizeY - 1), positionInVolume.Z * (float)(VolumeSizeZ - 1)), 0);
+                scb.g_InjectPosition = new Vector4(new Vector3(positionInVolume.X * (float)(m_VolumeSizeX - 1), positionInVolume.Y * (float)(m_VolumeSizeY - 1), positionInVolume.Z * (float)(m_VolumeSizeZ - 1)), 0);
                 m_GIConstantBuffer.CompileAndBind(context);
 
                 m_Downsampled4x4SHSetR.BindSRV(context, 2);

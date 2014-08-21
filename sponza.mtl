@@ -47,6 +47,8 @@ newmtl Material__57
 	Ke 0.0000 0.0000 0.0000
 	map_Ka textures\vase_plant.dds
 	map_Kd textures\vase_plant.dds
+    map_bump textures\vase_plant_ddn.dds
+    bump textures\vase_plant_ddn.dds
 	map_d textures\vase_plant_mask.dds
 
 newmtl Material__298
@@ -92,8 +94,8 @@ newmtl bricks
 	Ke 0.0000 0.0000 0.0000
 	map_Ka textures\spnza_bricks_a_diff.dds
 	map_Kd textures\spnza_bricks_a_diff.dds
-	map_bump textures\spnza_bricks_a_diff.dds
-	bump textures\spnza_bricks_a_diff.dds
+	map_bump textures\spnza_bricks_a_ddn.dds
+	bump textures\spnza_bricks_a_ddn.dds
 
 newmtl arch
 	Ns 10.0000
@@ -122,6 +124,8 @@ newmtl ceiling
 	Ke 0.0000 0.0000 0.0000
 	map_Ka textures\sponza_ceiling_a_diff.dds
 	map_Kd textures\sponza_ceiling_a_diff.dds
+    map_bump textures\sponza_ceiling_a_ddn.dds
+    bump textures\sponza_ceiling_a_ddn.dds
 
 newmtl column_a
 	Ns 10.0000
@@ -152,6 +156,8 @@ newmtl floor
 	Ke 0.0000 0.0000 0.0000
 	map_Ka textures\sponza_floor_a_diff.dds
 	map_Kd textures\sponza_floor_a_diff.dds
+    map_bump textures\sponza_floor_a_ddn.dds
+    bump textures\sponza_floor_a_ddn.dds
 
 newmtl column_c
 	Ns 10.0000

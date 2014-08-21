@@ -18,11 +18,12 @@ namespace CSharpRenderer
         public enum ConstantType
         {
             ConstantType_Float,
+            ConstantType_Int,
             ConstantType_Float4,
             ConstantType_Matrix44,
         }
 
-        public static string[] ConstantTypeStrings = {"float", "float4", "float4x4"};
+        public static string[] ConstantTypeStrings = {"float", "int", "float4", "float4x4"};
 
         public static object GetDefaultObjectForType(ConstantType type)
         {
@@ -30,6 +31,8 @@ namespace CSharpRenderer
             {
                 case ConstantType.ConstantType_Float:
                     return new Single();
+                case ConstantType.ConstantType_Int:
+                    return new Int32();
                 case ConstantType.ConstantType_Float4:
                     return new Vector4();
                 case ConstantType.ConstantType_Matrix44:
@@ -45,6 +48,8 @@ namespace CSharpRenderer
             {
                 case "float":
                     return ConstantType.ConstantType_Float;
+                case "int":
+                    return ConstantType.ConstantType_Int;
                 case "float4":
                     return ConstantType.ConstantType_Float4;
                 case "float4x4":
@@ -59,6 +64,8 @@ namespace CSharpRenderer
             switch (type)
             {
                 case ConstantType.ConstantType_Float:
+                    return 4;
+                case ConstantType.ConstantType_Int:
                     return 4;
                 case ConstantType.ConstantType_Float4:
                     return 4*4;
@@ -523,6 +530,9 @@ namespace CSharpRenderer
             {
                 case CustomConstantBufferDefinition.ConstantType.ConstantType_Float:
                     m_Writer.Write((Single)value);
+                    break;
+                case CustomConstantBufferDefinition.ConstantType.ConstantType_Int:
+                    m_Writer.Write((Int32)value);
                     break;
                 default:
                     m_Writer.Write(StructToByteArray(value));

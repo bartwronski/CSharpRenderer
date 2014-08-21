@@ -77,23 +77,24 @@ namespace CSharpRenderer
             m_ViewProjectionMatrix = m_WorldToView * m_ProjectionMatrix;
         }
 
-        public void TickCamera( float delta )
+        public void TickCamera( double delta )
         {
+            float floatDeltaSeconds = (float)(delta / 1000.0);
             if (m_InputDesc.wPressed)
             {
-                m_CameraPosition += 0.2f * m_CameraForward;
+                m_CameraPosition += 10.0f * floatDeltaSeconds * m_CameraForward;
             }
             if (m_InputDesc.sPressed)
             {
-                m_CameraPosition -= 0.2f * m_CameraForward;
+                m_CameraPosition -= 10.0f * floatDeltaSeconds * m_CameraForward;
             }
             if (m_InputDesc.aPressed)
             {
-                m_CameraPosition -= 0.2f * m_CameraRight;
+                m_CameraPosition -= 10.0f * floatDeltaSeconds * m_CameraRight;
             }
             if (m_InputDesc.dPressed)
             {
-                m_CameraPosition += 0.2f * m_CameraRight;
+                m_CameraPosition += 10.0f * floatDeltaSeconds * m_CameraRight;
             }
 
             Matrix camRotation = Matrix.RotationX(m_RotationY) * Matrix.RotationY(m_RotationX);

@@ -19,6 +19,8 @@ namespace CSharpRenderer
         const int ResolutionX = 1280;
         const int ResolutionY = 720;
 
+        static Dictionary<CustomConstantBufferDefinition.ConstantBufferPropertyField, Tuple<TrackBar, TextBox>> m_PropertyControlBindings;
+
         static void Main()
         {
             Device device;
@@ -51,53 +53,9 @@ namespace CSharpRenderer
             RenderTargetManager.Initialize(device);
             PostEffectHelper.Initialize(device, ResolutionX, ResolutionY);
             CubemapRenderHelper.Initialize(device);
+            PerlinNoiseRenderHelper.Initialize(device, device.ImmediateContext);
 
-            Dictionary<CustomConstantBufferDefinition.ConstantBufferPropertyField, Tuple<TrackBar, TextBox>> propertyControlBindings = 
-                new Dictionary<CustomConstantBufferDefinition.ConstantBufferPropertyField, Tuple<TrackBar, TextBox>>();
-
-            {
-                TableLayoutPanel tableLayout = form.GetTableLayoutPanel();
-
-                var contantBuffers = ShaderManager.GetConstantBufferDefinitions();
-
-                int tableParamCounter = 1;
-                foreach (var cb in contantBuffers)
-                {
-                    var paramProperties = cb.GetParamProperties();
-
-                    if (paramProperties.Count > 0)
-                    {
-                        Label groupLabel = new Label();
-                        groupLabel.Text = cb.m_Name;
-                        groupLabel.BorderStyle = BorderStyle.FixedSingle;
-                        groupLabel.Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top | AnchorStyles.Bottom;
-                        tableLayout.Controls.Add(groupLabel, 0, tableParamCounter);
-                        tableParamCounter++;
-
-                        foreach (var param in paramProperties)
-                        {
-                            Label lb = new Label();
-                            lb.Text = param.name;
-                            lb.Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top | AnchorStyles.Bottom;
-                            TextBox text = new TextBox();
-                            TrackBar tb = new TrackBar();
-                            tb.Size = new System.Drawing.Size(400, 10);
-                            tb.Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top | AnchorStyles.Bottom;
-                            tb.Minimum = 0;
-                            tb.Maximum = 1024;
-                            tb.Value = (int)(((Single)param.paramValue - param.paramRangeMin) / (param.paramRangeMax - param.paramRangeMin) * 1024);
-                            text.Text = ((Single)param.paramValue).ToString();
-                            text.Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top | AnchorStyles.Bottom;
-                            tableLayout.Controls.Add(lb, 0, tableParamCounter);
-                            tableLayout.Controls.Add(tb, 1, tableParamCounter);
-                            tableLayout.Controls.Add(text, 2, tableParamCounter);
-                            propertyControlBindings.Add(param, new Tuple<TrackBar, TextBox>(tb, text));
-                            tableParamCounter++;
-                        }
-
-                    }
-                }
-            }
+            InitializeControls(form);
 
             Scene scene = new Scene();
             scene.Initialize(device, form, panel, ResolutionX, ResolutionY);
@@ -117,13 +75,22 @@ namespace CSharpRenderer
             Dictionary<string, double> profilers;
             profilers = new Dictionary<String, double>();
 
+            DateTime now = DateTime.Now;
+
             MessagePump.Run(form, () =>
             {
                 TemporalSurfaceManager.UpdateTemporalSurfaces();
-                ShaderManager.UpdateShaderManager(device);
+                if (ShaderManager.UpdateShaderManager(device))
+                {
+                    InitializeControls(form);
+                }
 
                 GPUProfiler.BeginFrameProfiling(context);
-                scene.RenderFrame(context, 0.0f, resolvedRenderTarget);
+
+                double timeDelta = (DateTime.Now - now).TotalMilliseconds;
+                
+                scene.RenderFrame(context, timeDelta, resolvedRenderTarget);
+                now = DateTime.Now;
                 context.CopyResource(resolvedRenderTarget.m_RenderTargets[0].m_TextureObject2D, swapChainResource);
                 GPUProfiler.EndFrameProfiling(context);
                 swapChain.Present(0, PresentFlags.None);
@@ -157,21 +124,7 @@ namespace CSharpRenderer
 
                 if (++counter == 10)
                 {
-                    foreach (var propertyBinding in propertyControlBindings)
-                    {
-                        var property = propertyBinding.Key;
-                        var trackBar = propertyBinding.Value.Item1;
-                        var textBox = propertyBinding.Value.Item2;
-
-                        float rawVal = (float)trackBar.Value / 1024.0f;
-                        if (property.isGamma)
-                        {
-                            rawVal = (float)Math.Pow((double)rawVal, 2.2);
-                        }
-                        float val = rawVal * (property.paramRangeMax - property.paramRangeMin) + property.paramRangeMin;
-                        property.paramValue = val;
-                        textBox.Text = val.ToString("F");
-                    }
+                    UpdateControls();
 
                     DataGridView dataGridView = form.GetDataGridView();
                     dataGridView.Rows.Clear();
@@ -189,8 +142,97 @@ namespace CSharpRenderer
 
                     counter = 0;
                 }
-                System.Threading.Thread.Sleep(15);
+                else
+                {
+                    // avoid 2ms frame times...
+                    System.Threading.Thread.Sleep(10);
+                }
             });
+        }
+
+        private static void UpdateControls()
+        {
+            foreach (var propertyBinding in m_PropertyControlBindings)
+            {
+                var property = propertyBinding.Key;
+                var trackBar = propertyBinding.Value.Item1;
+                var textBox = propertyBinding.Value.Item2;
+
+                float rawVal = (float)trackBar.Value / 1024.0f;
+                if (property.isGamma)
+                {
+                    rawVal = (float)Math.Pow((double)rawVal, 2.2);
+                }
+                float val = rawVal * (property.paramRangeMax - property.paramRangeMin) + property.paramRangeMin;
+                property.paramValue = val;
+                textBox.Text = val.ToString("F");
+            }
+        }
+
+        private static void InitializeControls(CSharpRendererMainForm form)
+        {
+            Dictionary<String, int> oldValues = new Dictionary<String, int>();
+            // record old values
+            if (m_PropertyControlBindings != null)
+            {
+                foreach (var propertyBinding in m_PropertyControlBindings)
+                {
+                    oldValues.Add(propertyBinding.Key.name, propertyBinding.Value.Item1.Value);
+                }
+            }
+
+            m_PropertyControlBindings = new Dictionary<CustomConstantBufferDefinition.ConstantBufferPropertyField, Tuple<TrackBar, TextBox>>();
+            
+            TableLayoutPanel tableLayout = form.GetTableLayoutPanel();
+            tableLayout.Controls.Clear();
+            var contantBuffers = ShaderManager.GetConstantBufferDefinitions();
+
+            int tableParamCounter = 1;
+            foreach (var cb in contantBuffers)
+            {
+                var paramProperties = cb.GetParamProperties();
+
+                if (paramProperties.Count > 0)
+                {
+                    Label groupLabel = new Label();
+                    groupLabel.Text = cb.m_Name;
+                    groupLabel.BorderStyle = BorderStyle.FixedSingle;
+                    groupLabel.Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top | AnchorStyles.Bottom;
+                    tableLayout.Controls.Add(groupLabel, 0, tableParamCounter);
+                    tableParamCounter++;
+
+                    foreach (var param in paramProperties)
+                    {
+                        Label lb = new Label();
+                        lb.Text = param.name;
+                        lb.Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top | AnchorStyles.Bottom;
+                        TextBox text = new TextBox();
+                        TrackBar tb = new TrackBar();
+                        tb.Size = new System.Drawing.Size(400, 10);
+                        tb.Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top | AnchorStyles.Bottom;
+                        tb.Minimum = 0;
+                        tb.Maximum = 1024;
+
+                        string key = param.name;
+                        int value = (int)(((Single)param.paramValue - param.paramRangeMin) / (param.paramRangeMax - param.paramRangeMin) * 1024);
+                        int potentialOldVal;
+
+                        if (oldValues.TryGetValue(key, out potentialOldVal))
+                            value = potentialOldVal;
+
+                        tb.Value = value;
+                        text.Text = key;
+                        text.Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top | AnchorStyles.Bottom;
+                        tableLayout.Controls.Add(lb, 0, tableParamCounter);
+                        tableLayout.Controls.Add(tb, 1, tableParamCounter);
+                        tableLayout.Controls.Add(text, 2, tableParamCounter);
+                        m_PropertyControlBindings.Add(param, new Tuple<TrackBar, TextBox>(tb, text));
+                        tableParamCounter++;
+                    }
+
+                }
+            }
+
         }
     }
 }
