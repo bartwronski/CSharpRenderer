@@ -112,6 +112,30 @@ namespace CSharpRenderer
             }
         }
 
+        public static void CopyAlpha(DeviceContext context, RenderTargetSet target, RenderTargetSet source)
+        {
+            using (new GpuProfilePoint(context, "Copy"))
+            {
+                source.BindSRV(context, 0);
+                target.BindAsRenderTarget(context);
+                PostEffectHelper.RenderFullscreenTriangle(context, "CopyAlpha");
+                RenderTargetSet.BindNull(context);
+                ContextHelper.ClearSRVs(context);
+            }
+        }
+
+        public static void CopyFrac(DeviceContext context, RenderTargetSet target, RenderTargetSet source)
+        {
+            using (new GpuProfilePoint(context, "Copy"))
+            {
+                source.BindSRV(context, 0);
+                target.BindAsRenderTarget(context);
+                PostEffectHelper.RenderFullscreenTriangle(context, "CopyFrac");
+                RenderTargetSet.BindNull(context);
+                ContextHelper.ClearSRVs(context);
+            }
+        }
+
         public static void LinearizeDepth(DeviceContext context, RenderTargetSet target, RenderTargetSet source)
         {
             using (new GpuProfilePoint(context, "LinearizeDepth"))

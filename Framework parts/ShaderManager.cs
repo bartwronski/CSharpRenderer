@@ -337,8 +337,19 @@ namespace CSharpRenderer
             }
         }
 
+        private static void BindDebugUAV(DeviceContext context)
+        {
+            if (SurfaceDebugManager.m_GPUDebugOn)
+            {
+                context.ComputeShader.SetUnorderedAccessView(SurfaceDebugManager.m_DebugAppendBuffer.m_UnorderedAccessView, 7, SurfaceDebugManager.m_FirstCallThisFrame ? 0 : -1);
+                SurfaceDebugManager.m_FirstCallThisFrame = false;
+            }
+        }
+
         public static void ExecuteComputeForResource(DeviceContext context, TextureObject textureResource, string shader)
         {
+            BindDebugUAV(context);
+
             ShaderWrapper wrapper = m_Shaders[shader];
             context.ComputeShader.Set(wrapper.m_ComputeShader);
             context.Dispatch(
@@ -349,6 +360,8 @@ namespace CSharpRenderer
 
         public static void ExecuteComputeForSize(DeviceContext context, int x, int y, int z, string shader)
         {
+            BindDebugUAV(context);
+
             ShaderWrapper wrapper = m_Shaders[shader];
             context.ComputeShader.Set(wrapper.m_ComputeShader);
             context.Dispatch(

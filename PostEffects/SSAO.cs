@@ -52,6 +52,8 @@ namespace CSharpRenderer
                     ContextHelper.ClearSRVs(context);
                 }
 
+                SurfaceDebugManager.RegisterDebug(context, "SSAOMain", ssaoCurrent);
+
                 using (new GpuProfilePoint(context, "SSAOBlur"))
                 {
                     ssaoCurrent.BindSRV(context, 1);
@@ -60,11 +62,15 @@ namespace CSharpRenderer
                     RenderTargetSet.BindNull(context);
                     ContextHelper.ClearSRVs(context);
 
+                    SurfaceDebugManager.RegisterDebug(context, "SSAOBlurH", tempBlurBuffer);
+
                     tempBlurBuffer.BindSRV(context, 1);
                     target.BindAsRenderTarget(context);
                     PostEffectHelper.RenderFullscreenTriangle(context, "SSAOBlurVertical");
                     RenderTargetSet.BindNull(context);
                     ContextHelper.ClearSRVs(context);
+
+                    SurfaceDebugManager.RegisterDebug(context, "SSAOBlurV", target);
                 }
             }
             

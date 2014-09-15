@@ -130,7 +130,21 @@ namespace CSharpRenderer
             }
             else
             {
-                context.OutputMerger.SetTargets(depth ? m_DepthStencil.m_DepthStencilView : null, renderTargetViews);
+                if (SurfaceDebugManager.m_GPUDebugOn)
+                {
+                    UnorderedAccessView[] unorderedAccessViewsDebug = new UnorderedAccessView[1];
+                    unorderedAccessViewsDebug[0] = SurfaceDebugManager.m_DebugAppendBuffer.m_UnorderedAccessView;
+
+                    int[] initialLenghts = new int[1];
+                    initialLenghts[0] = SurfaceDebugManager.m_FirstCallThisFrame ? 0 : -1;
+                    SurfaceDebugManager.m_FirstCallThisFrame = false;
+
+                    context.OutputMerger.SetTargets(depth ? m_DepthStencil.m_DepthStencilView : null, 7, unorderedAccessViewsDebug, initialLenghts, color ? renderTargetViews : null);
+                }
+                else
+                {
+                    context.OutputMerger.SetTargets(depth ? m_DepthStencil.m_DepthStencilView : null, renderTargetViews);
+                }
             }
             
             context.Rasterizer.SetViewports(m_Viewport);

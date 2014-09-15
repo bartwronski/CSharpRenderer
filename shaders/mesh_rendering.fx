@@ -212,7 +212,7 @@ float4 PShader(VS_OUTPUT i) : SV_Target
     finalLight.diffuse += localLightsLight.diffuse;
     finalLight.specular += localLightsLight.specular;
 #endif
-    
+
     float3 lighting = finalLight.diffuse * albedo + finalLight.specular;
 
     return float4(lighting * fog.aaa + fog.rgb, 1.0f);

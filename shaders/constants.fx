@@ -4,7 +4,17 @@
 #include "sampler_states.fx"
 #include "shader_fast_math.fx"
 
-cbuffer GlobalViewportBuffer : register(b0) // Global
+cbuffer GlobalFrameBuffer : register(b0) // Global
+{
+    float4      g_FrameRandoms;
+    float       g_Time;
+    int         g_FrameNumber;
+    float       g_GPUDebugOn;
+    float       g_GPUDebugOverridePositionEnable;
+    float4      g_GPUDebugOverridePositionXYZ;
+};
+
+cbuffer GlobalViewportBuffer : register(b1) // Global
 {
     float4x4    g_ViewProjMatrixPrevFrame;
 
@@ -37,7 +47,9 @@ cbuffer GlobalViewportBuffer : register(b0) // Global
     ENDSCRIPT */
 };
 
-cbuffer CurrentViewport : register(b1)
+#include "shader_debug_inc.fx"
+
+cbuffer CurrentViewport : register(b2)
 {
     float4x4    g_ViewMatrix;
     float4x4    g_ProjMatrix;
@@ -45,7 +57,7 @@ cbuffer CurrentViewport : register(b1)
     float4x4    g_InvViewProjMatrix;
 };
 
-cbuffer ForwardPassBuffer : register(b2)
+cbuffer ForwardPassBuffer : register(b3)
 {
     float4x4    g_ShadowViewProjMatrix;
     float4x4    g_ShadowInvViewProjMatrix;
@@ -69,7 +81,7 @@ cbuffer ForwardPassBuffer : register(b2)
 
 };
 
-cbuffer PostEffects : register(b3)
+cbuffer PostEffects : register(b4)
 {
     /// Bokeh
     float       g_CocScale;                     // Scripted
@@ -77,9 +89,6 @@ cbuffer PostEffects : register(b3)
     float       g_FocusPlane;                   // Param, Default: 2.0, Range:0.0-10.0, Linear
     float       g_DofCoCScale;                  // Param, Default: 0.0, Range:0.0-32.0, Linear
     float       g_DebugBokeh;                   // Param, Default: 0.0, Range:0.0-1.0, Linear
-
-    float       g_Time;
-    int         g_FrameNumber;
 
     float       g_VolumetricFogRange;           // Param, Default: 100.0, Range:1.0-256.0, Linear
     float       g_VolumetricFogScattering;      // Param, Default: 1.0, Range:0.0-10.0, Linear

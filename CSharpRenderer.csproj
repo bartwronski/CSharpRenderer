@@ -89,6 +89,7 @@
     <Compile Include="Algorithms\GeometricsAlgorithms.cs" />
     <Compile Include="Algorithms\GlobalIllumination.cs" />
     <Compile Include="Framework parts\RenderTargetManager.cs" />
+    <Compile Include="Framework parts\SurfaceDebugManager.cs" />
     <Compile Include="Helpers\CubemapRenderHelper.cs" />
     <Compile Include="Helpers\PerlinNoiseHelper.cs" />
     <Compile Include="Helpers\PostEffectHelper.cs" />
@@ -162,6 +163,7 @@
     <Content Include="Shaders\posteffects_temporal.fx" />
     <Content Include="Shaders\posteffect_helpers.fx" />
     <Content Include="Shaders\sampler_states.fx" />
+    <Content Include="Shaders\shader_debug_inc.fx" />
     <Content Include="Shaders\shader_fast_math.fx" />
     <Content Include="Shaders\ssao.fx" />
     <Content Include="Shaders\volumetric_fog.fx" />

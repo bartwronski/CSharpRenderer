@@ -1,6 +1,6 @@
 
 #define VOLUME_WIDTH  160.0 // GlobalDefine
-#define VOLUME_HEIGHT 90.0 // GlobalDefine
+#define VOLUME_HEIGHT 90.0  // GlobalDefine
 #define VOLUME_DEPTH  128.0 // GlobalDefine
 
 #define FOG_RANGE g_VolumetricFogRange

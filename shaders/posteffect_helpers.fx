@@ -3,6 +3,8 @@
 // PixelShader:  PixelTest, entry: PShader
 // PixelShader:  ResolveHDR, entry: ResolvePS
 // PixelShader:  Copy, entry: PShaderCopy
+// PixelShader:  CopyAlpha, entry: PShaderCopy, defines: ALPHA
+// PixelShader:  CopyFrac, entry: PShaderCopy, defines: FRAC
 // PixelShader:  ResolveMotionVectors, entry: ResolveMotionVectors
 // PixelShader:  LinearizeDepth, entry: PShaderLinearizeDepth
 // PixelShader:  FXAA, entry: FxaaPS
@@ -45,7 +47,13 @@ float4 PShader(VS_OUTPUT_POSTFX i) : SV_Target
 float4 PShaderCopy(VS_OUTPUT_POSTFX i) : SV_Target
 {
     float4 textureSample = InputTexture.SampleLevel(pointSampler, i.uv, 0);
+#ifdef ALPHA
+    return textureSample.aaaa;
+#elif defined(FRAC)
+    return frac(textureSample);
+#else
     return textureSample;
+#endif
 }
 
 float PShaderLinearizeDepth(VS_OUTPUT_POSTFX i) : SV_Target
@@ -75,7 +83,6 @@ float4 ResolvePS(VS_OUTPUT_POSTFX i) : SV_Target
     float avgLuminance = LuminanceTexture[uint2(0,0)];
     float3 whiteScale = 1.0f / Uncharted2Tonemap(2.5 * avgLuminance);
     color = color*whiteScale;
-
     return float4(LinearToGamma(color), 1.0f);
 }
 
@@ -180,6 +187,9 @@ void FinalCalculateAverageLuminance(uint3 dispatchThreadID : SV_DispatchThreadID
 float4 FxaaPS(VS_OUTPUT_POSTFX Input) : SV_TARGET
 {
     FxaaTex tex = { anisoSampler, InputTexture };
-    return float4(FxaaPixelShader(
-        Input.uv.xy, tex, g_ScreenSize.zw), 1.0f);
+
+    float noise = (rand(Input.uv.xy + g_FrameRandoms.xy)-0.5f) * 7.0f / 255.0f;
+    float3 aaImage = FxaaPixelShader(Input.uv.xy, tex, g_ScreenSize.zw);
+
+    return float4(max(aaImage + noise.xxx,0.0f),1.0f);
 }

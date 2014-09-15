@@ -239,6 +239,7 @@ namespace CSharpRenderer
             m_ResolveMotionVectorsPass.ExecutePass(context, motionVectorsSurface, currentFrameMainBuffer);
 
             PostEffectHelper.LinearizeDepth(context, linearDepth, currentFrameMainBuffer);
+            SurfaceDebugManager.RegisterDebug(context, "LinearDepth", linearDepth);
             m_SSAOPass.ExecutePass(context, ssaoRT, linearDepth, motionVectorsSurface);
 
             m_VolumetricFog.RenderVolumetricFog(context, m_ResolvedShadow.m_RenderTargets[0], m_GIRenderer);
@@ -298,6 +299,7 @@ namespace CSharpRenderer
 
                 RenderTargetSet resolvedTemporal = RenderTargetManager.RequestRenderTargetFromPool(m_ResolvedColorDescriptor);
                 m_ResolveTemporalPass.ExecutePass(context, resolvedTemporal, resolvedCurrent, resolvedHistory, motionVectorsSurface, motionVectorsSurfacePrevious, true);
+                SurfaceDebugManager.RegisterDebug(context, "ResolvedNoFXAA", resolvedTemporal);
                 m_FxaaPass.ExecutePass(context, targetRT, resolvedTemporal);
 
                 RenderTargetManager.ReleaseRenderTargetToPool(resolvedTemporal);
@@ -330,7 +332,7 @@ namespace CSharpRenderer
                 //float translationOffset = (TemporalSurfaceManager.GetCurrentPhase("ResolvedColor") == 0) ? 0.5f : -0.5f;
                 //float translationOffsetX = translationOffset;
                 //float translationOffsetY = translationOffset;
-                temporalJitter = Matrix.Translation((POISSON_SAMPLES[(m_FrameNumber) % POISSON_SAMPLE_NUM * 2 + 0] - 0.5f) / (float)m_ResolutionX, (POISSON_SAMPLES[(m_FrameNumber) % POISSON_SAMPLE_NUM * 2 + 1] - 0.5f) / (float)m_ResolutionY, 0.0f);
+                temporalJitter = Matrix.Translation((POISSON_SAMPLES[(m_FrameNumber) % POISSON_SAMPLE_NUM * 2 + 0] * 2.0f - 1.0f) / (float)m_ResolutionX, (POISSON_SAMPLES[(m_FrameNumber) % POISSON_SAMPLE_NUM * 2 + 1] * 2.0f - 1.0f) / (float)m_ResolutionY, 0.0f);
             }
             m_ScatterDOFPass.m_DebugBokeh = ppcb.g_DebugBokeh > 0.5f;
 
@@ -375,12 +377,10 @@ namespace CSharpRenderer
             mcb.g_ShadowInvViewProjMatrix.Invert();
             mcb.g_LightDir = new Vector4(-m_ShadowCamera.m_CameraForward, 1.0f);
             mcb.g_LightColor = new Vector4(1.0f, 0.95f, 0.9f, 0.0f);
-            float time = (float)((DateTime.Now - m_StartTime).TotalSeconds);
+            
+            float time = (float)Program.m_Time;
             mcb.g_LocalPointLightPosition = new Vector4((float)Math.Sin(0.05f * time) * 10.0f, 2.0f, (float)Math.Cos(time * 0.15f) * 5.8f, 0.0f);
             mcb.g_LocalPointLightColor = new Vector4(1, 0, 0, 0);
-
-            ppcb.g_Time = time;
-            ppcb.g_FrameNumber = m_FrameNumber++;
 
             m_ViewportConstantBuffer.CompileAndBind(context);
             m_ForwardPassBuffer.CompileAndBind(context);

@@ -34,7 +34,7 @@ namespace CSharpRenderer
 
                 // set the shaders
                 context.VertexShader.Set(ShaderManager.GetVertexShader("VertexScene"));
-                context.PixelShader.Set(depthOnly ? null : ShaderManager.GetPixelShader("PixelSceneNoSSAO"));
+                context.PixelShader.Set(depthOnly ? null : ShaderManager.GetPixelShader("PixelSceneSimple"));
 
                 dynamic cvpb = m_CurrentViewportBuffer;
 

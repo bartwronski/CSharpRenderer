@@ -107,7 +107,7 @@ namespace CSharpRenderer
         public void BindToInput(Form form, Panel panel)
         {
             // handle alt+enter ourselves
-            form.KeyDown += (o, e) =>
+            panel.KeyDown += (o, e) =>
             {
                 if (e.KeyCode == Keys.W)
                 {
@@ -127,7 +127,7 @@ namespace CSharpRenderer
                 }
             };
 
-            form.KeyUp += (o, e) =>
+            panel.KeyUp += (o, e) =>
             {
                 if (e.KeyCode == Keys.W)
                 {
@@ -162,6 +162,13 @@ namespace CSharpRenderer
                     m_RotationY = Math.Min(Math.Max(m_RotationY, -(float)Math.PI / 2.0f + 0.01f), (float)Math.PI / 2.0f - 0.01f);
                 }
                
+            };
+
+            panel.MouseDown += (o, e) =>
+            {
+                Program.m_ClickedX = e.X;
+                Program.m_ClickedY = e.Y;
+                panel.Focus(); 
             };
         }
     }

@@ -18,11 +18,18 @@ namespace CSharpRenderer
     {
         const int ResolutionX = 1280;
         const int ResolutionY = 720;
+        static int m_FrameNumber;
+        public static double m_Time;
+        public static int m_ClickedX;
+        public static int m_ClickedY;
 
         static Dictionary<CustomConstantBufferDefinition.ConstantBufferPropertyField, Tuple<TrackBar, TextBox>> m_PropertyControlBindings;
 
         static void Main()
         {
+            m_FrameNumber = 0;
+            m_Time = 0.0f;
+
             Device device;
             SwapChain swapChain;
 
@@ -54,6 +61,7 @@ namespace CSharpRenderer
             PostEffectHelper.Initialize(device, ResolutionX, ResolutionY);
             CubemapRenderHelper.Initialize(device);
             PerlinNoiseRenderHelper.Initialize(device, device.ImmediateContext);
+            SurfaceDebugManager.Initialize(device, ResolutionX, ResolutionY);
 
             InitializeControls(form);
 
@@ -77,6 +85,8 @@ namespace CSharpRenderer
 
             DateTime now = DateTime.Now;
 
+            CustomConstantBufferInstance globalFrameConstantBuffer = ShaderManager.CreateConstantBufferInstance("GlobalFrameBuffer", device);
+
             MessagePump.Run(form, () =>
             {
                 TemporalSurfaceManager.UpdateTemporalSurfaces();
@@ -89,8 +99,17 @@ namespace CSharpRenderer
 
                 double timeDelta = (DateTime.Now - now).TotalMilliseconds;
                 
+                if (!form.GetFreezeTime())
+                {
+                    m_Time += timeDelta / 1000.0;
+                    m_FrameNumber++;
+                }
+                
+                UpdateGlobalConstantBuffer(context, globalFrameConstantBuffer, form);
+
                 scene.RenderFrame(context, timeDelta, resolvedRenderTarget);
                 now = DateTime.Now;
+                SurfaceDebugManager.PresentDebug(context, resolvedRenderTarget);
                 context.CopyResource(resolvedRenderTarget.m_RenderTargets[0].m_TextureObject2D, swapChainResource);
                 GPUProfiler.EndFrameProfiling(context);
                 swapChain.Present(0, PresentFlags.None);
@@ -122,10 +141,11 @@ namespace CSharpRenderer
                     processLevel(GPUProfiler.m_CurrentFrameProfilerTree, "");
                 }
 
+                CheckAndUpdateDebugUI(context, form);
+
                 if (++counter == 10)
                 {
                     UpdateControls();
-
                     DataGridView dataGridView = form.GetDataGridView();
                     dataGridView.Rows.Clear();
 
@@ -148,6 +168,52 @@ namespace CSharpRenderer
                     System.Threading.Thread.Sleep(10);
                 }
             });
+        }
+
+        private static void UpdateGlobalConstantBuffer(DeviceContext context, CustomConstantBufferInstance globalFrameConstantBuffer, CSharpRendererMainForm form)
+        {
+            dynamic gfcb = globalFrameConstantBuffer;
+            Random rand = new Random();
+
+            gfcb.g_Time = (float)m_Time;
+            gfcb.g_FrameRandoms = new Vector4((float)rand.NextDouble(), (float)rand.NextDouble(), (float)rand.NextDouble(), (float)rand.NextDouble());
+            gfcb.g_FrameNumber = m_FrameNumber;
+            gfcb.g_GPUDebugOn = SurfaceDebugManager.m_GPUDebugOn ? 1.0f : 0.0f;
+            gfcb.g_GPUDebugOverridePositionEnable = form.GetGPUDebuggingOverridePos() ? 1.0f : 0.0f;
+            gfcb.g_GPUDebugOverridePositionXYZ = new Vector4((float)form.GetGPUDebuggingOverridePosX(), (float)form.GetGPUDebuggingOverridePosY(), (float)form.GetGPUDebuggingOverridePosZ(), 0.0f);
+            globalFrameConstantBuffer.CompileAndBind(context);
+        }
+
+        private static void CheckAndUpdateDebugUI(DeviceContext context, CSharpRendererMainForm form)
+        {
+            ComboBox cb = form.GetDebugSurface();
+            ComboBox cbM = form.GetDebugMode();
+            if (SurfaceDebugManager.m_IsUIRebuildRequired)
+            {
+                cb.Items.Clear();
+                cb.Items.AddRange(SurfaceDebugManager.m_AvailableModes.ToArray());
+
+                SurfaceDebugManager.m_IsUIRebuildRequired = false;
+                cbM.SelectedIndex = 0;
+                cb.SelectedIndex = 0;
+            }
+
+            if (cb.SelectedIndex >= 0 && form.GetDebugModeOn())
+            {
+                SurfaceDebugManager.m_CurrentDebugSurface = (string)cb.Items[cb.SelectedIndex];
+                SurfaceDebugManager.m_CurrentDebugMode = cbM.SelectedIndex > 0 ? (string)cbM.Items[cbM.SelectedIndex] : "RGB";
+            }
+            else
+            {
+                SurfaceDebugManager.m_CurrentDebugSurface = "None";
+            }
+
+            if (SurfaceDebugManager.m_GPUDebugOn)
+            {
+                form.GetGPUDebuggingTB().Text = SurfaceDebugManager.GetDebugString(context);
+            }
+            
+            SurfaceDebugManager.SetGPUDebugMode(form.GetGPUDebugModeOn());
         }
 
         private static void UpdateControls()
