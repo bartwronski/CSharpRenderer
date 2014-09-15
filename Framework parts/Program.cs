@@ -18,7 +18,7 @@ namespace CSharpRenderer
     {
         const int ResolutionX = 1280;
         const int ResolutionY = 720;
-        static int m_FrameNumber;
+        public static int m_FrameNumber;
         public static double m_Time;
         public static int m_ClickedX;
         public static int m_ClickedY;

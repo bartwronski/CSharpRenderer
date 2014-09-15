@@ -41,8 +41,7 @@ namespace CSharpRenderer
 
         int m_ResolutionX;
         int m_ResolutionY;
-        int m_FrameNumber;
-
+        
         const int POISSON_SAMPLE_NUM = 8;
         float[] POISSON_SAMPLES;
 
@@ -332,7 +331,7 @@ namespace CSharpRenderer
                 //float translationOffset = (TemporalSurfaceManager.GetCurrentPhase("ResolvedColor") == 0) ? 0.5f : -0.5f;
                 //float translationOffsetX = translationOffset;
                 //float translationOffsetY = translationOffset;
-                temporalJitter = Matrix.Translation((POISSON_SAMPLES[(m_FrameNumber) % POISSON_SAMPLE_NUM * 2 + 0] * 2.0f - 1.0f) / (float)m_ResolutionX, (POISSON_SAMPLES[(m_FrameNumber) % POISSON_SAMPLE_NUM * 2 + 1] * 2.0f - 1.0f) / (float)m_ResolutionY, 0.0f);
+                temporalJitter = Matrix.Translation((POISSON_SAMPLES[(Program.m_FrameNumber) % POISSON_SAMPLE_NUM * 2 + 0] * 2.0f - 1.0f) / (float)m_ResolutionX, (POISSON_SAMPLES[(Program.m_FrameNumber) % POISSON_SAMPLE_NUM * 2 + 1] * 2.0f - 1.0f) / (float)m_ResolutionY, 0.0f);
             }
             m_ScatterDOFPass.m_DebugBokeh = ppcb.g_DebugBokeh > 0.5f;
 

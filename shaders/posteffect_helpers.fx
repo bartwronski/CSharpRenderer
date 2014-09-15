@@ -81,7 +81,7 @@ float4 ResolvePS(VS_OUTPUT_POSTFX i) : SV_Target
     float4 textureSample = InputTexture.SampleLevel( pointSampler, i.uv, 0 );
     float3 color = Uncharted2Tonemap(textureSample.rgb);
     float avgLuminance = LuminanceTexture[uint2(0,0)];
-    float3 whiteScale = 1.0f / Uncharted2Tonemap(2.5 * avgLuminance);
+    float3 whiteScale = 1.0f / Uncharted2Tonemap(2.0f * avgLuminance);
     color = color*whiteScale;
     return float4(LinearToGamma(color), 1.0f);
 }
@@ -188,7 +188,7 @@ float4 FxaaPS(VS_OUTPUT_POSTFX Input) : SV_TARGET
 {
     FxaaTex tex = { anisoSampler, InputTexture };
 
-    float noise = (rand(Input.uv.xy + g_FrameRandoms.xy)-0.5f) * 7.0f / 255.0f;
+    float noise = (rand(Input.uv.xy + g_FrameRandoms.xy)-0.5f) * 4.0f / 255.0f;
     float3 aaImage = FxaaPixelShader(Input.uv.xy, tex, g_ScreenSize.zw);
 
     return float4(max(aaImage + noise.xxx,0.0f),1.0f);

@@ -482,20 +482,25 @@ namespace CSharpRenderer
                 m_FilesToReload.Clear();
             }
 
-            foreach (var fileToReload in filesToReload)
+            if (filesToReload.Count > 0)
             {
-                ParseFile(device, fileToReload);
-            }
-
-            lock (CustomConstantBufferInstance.m_Lock)
-            {
-                foreach (var bufferInstance in CustomConstantBufferInstance.s_AllInstances)
+                foreach (var fileToReload in filesToReload)
                 {
-                    bufferInstance.CreateBufferInstance(bufferInstance.m_Definition, device, false);
+                    ParseFile(device, fileToReload);
                 }
+
+                lock (CustomConstantBufferInstance.m_Lock)
+                {
+                    foreach (var bufferInstance in CustomConstantBufferInstance.s_AllInstances)
+                    {
+                        bufferInstance.CreateBufferInstance(bufferInstance.m_Definition, device, false);
+                    }
+                }
+
+                return true;
             }
 
-            return filesToReload.Count > 0;
+            return false;
         }
 
         public static VertexShader GetVertexShader(string name)

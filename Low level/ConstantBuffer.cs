@@ -462,53 +462,54 @@ namespace CSharpRenderer
             var scriptedProperties = m_Definition.GetScriptedProperties();
             if (scriptedProperties.Count > 0)
             {
-                Lua luaContext = new Lua();
-
-                foreach(var globalBuffer in s_AllGlobalInstances)
+                using( Lua luaContext = new Lua() )
                 {
-                    foreach(var val in globalBuffer.m_Values)
+                    foreach (var globalBuffer in s_AllGlobalInstances)
                     {
-                        string  name = val.Key;
-                        object value = val.Value;
-                        FillScriptLuaContext(luaContext, name, value);
+                        foreach (var val in globalBuffer.m_Values)
+                        {
+                            string name = val.Key;
+                            object value = val.Value;
+                            FillScriptLuaContext(luaContext, name, value);
+                        }
+
+                        var bufferParamProperties = globalBuffer.m_Definition.GetParamProperties();
+                        foreach (var param in bufferParamProperties)
+                        {
+                            string name = param.name;
+                            object value = param.paramValue;
+                            FillScriptLuaContext(luaContext, name, value);
+                        }
+                    }
+                    if (!s_AllGlobalInstances.Contains(this))
+                    {
+                        foreach (var val in m_Values)
+                        {
+                            string name = val.Key;
+                            object value = val.Value;
+                            FillScriptLuaContext(luaContext, name, value);
+                        }
+
+                        var bufferParamProperties = m_Definition.GetParamProperties();
+                        foreach (var param in bufferParamProperties)
+                        {
+                            string name = param.name;
+                            object value = param.paramValue;
+                            FillScriptLuaContext(luaContext, name, value);
+                        }
                     }
 
-                    var bufferParamProperties = globalBuffer.m_Definition.GetParamProperties();
-                    foreach (var param in bufferParamProperties)
-                    {
-                        string name = param.name;
-                        object value = param.paramValue;
-                        FillScriptLuaContext(luaContext, name, value);
-                    }
-                }
-                if (!s_AllGlobalInstances.Contains(this))
-                {
-                    foreach (var val in m_Values)
-                    {
-                        string name = val.Key;
-                        object value = val.Value;
-                        FillScriptLuaContext(luaContext, name, value);
-                    }
+                    // Execute!
+                    luaContext.DoString(m_Definition.m_Script);
 
-                    var bufferParamProperties = m_Definition.GetParamProperties();
-                    foreach (var param in bufferParamProperties)
+                    foreach (var scriptedProperty in scriptedProperties)
                     {
-                        string name = param.name;
-                        object value = param.paramValue;
-                        FillScriptLuaContext(luaContext, name, value);
+                        m_Writer.Seek(scriptedProperty.byteOffset, SeekOrigin.Begin);
+                        CustomConstantBufferDefinition.ConstantType type = scriptedProperty.type;
+                        float value = (float)(double)luaContext[scriptedProperty.name];
+
+                        BufferWriteType(type, value);
                     }
-                }
-
-                // Execute!
-                luaContext.DoString(m_Definition.m_Script);
-                
-                foreach (var scriptedProperty in scriptedProperties)
-                {
-                    m_Writer.Seek(scriptedProperty.byteOffset, SeekOrigin.Begin);
-                    CustomConstantBufferDefinition.ConstantType type = scriptedProperty.type;
-                    float value = (float)(double)luaContext[scriptedProperty.name];
-
-                    BufferWriteType(type, value);
                 }
             }
 
