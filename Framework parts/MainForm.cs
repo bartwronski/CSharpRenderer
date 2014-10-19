@@ -81,10 +81,35 @@ namespace CSharpRenderer
             return gpuDebugTextBox;
         }
 
+        public CheckedListBox GetFeatureCLB()
+        {
+            return featureListBox;
+        }
+
+        public bool GetDisabledTemporal()
+        {
+            return noTemporalCB.Checked;
+        }
+
         private void pickPixelButton_Click(object sender, EventArgs e)
         {
             overrideGPUDebugPositionXUD.Value = Program.m_ClickedX;
             overrideGPUDebugPositionYUD.Value = Program.m_ClickedY;
+        }
+
+        public bool GetShowSnapshot()
+        {
+            return showSnapshotCB.Checked;
+        }
+
+        public bool GetShowSnapshotDifference()
+        {
+            return differenceCB.Checked;
+        }
+
+        private void takeSnapshotBtn_Click(object sender, EventArgs e)
+        {
+            Program.m_TakeSnapshot = true;
         }
     }
 }

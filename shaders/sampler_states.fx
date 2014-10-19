@@ -4,3 +4,5 @@ SamplerState            linearWrapSampler       : register(s2);
 SamplerComparisonState  linearComparisonSampler : register(s3);
 SamplerState            pointWrapSampler        : register(s4);
 SamplerState            anisoSampler            : register(s5);
+SamplerState            anisoWrapSampler        : register(s6);
+

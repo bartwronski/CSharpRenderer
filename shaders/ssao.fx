@@ -5,8 +5,9 @@
 #include "constants.fx"
 
 Texture2D<float>  InputTextureLinearDepth       : register(t0);
-Texture2D<float4> InputTextureSSAO              : register(t1);
+Texture2D<float2> InputTextureSSAO              : register(t1);
 Texture2D<float2> InputTextureMotion            : register(t2);
+Texture2D<float4> InputTextureNormals           : register(t3);
 
 cbuffer SSAOBuffer : register(b7)
 {
@@ -80,7 +81,7 @@ static const float bias = 0.02f;
 You can compute it from your projection matrix.  The actual value is just
 a scale factor on radius; you can simply hardcode this to a constant (~500)
 and make your radius value unitless (...but resolution dependent.)  */
-static const float projScale = 500.0f;
+static const float projScale = 250.0f;
 
 /** Reconstruct camera-space P.xyz from screen-space S = (x, y) in
 pixels and camera-space z < 0.  Assumes that the upper-left pixel center
@@ -89,7 +90,7 @@ was placed!]
 */
 float3 reconstructCSPosition(float2 S, float z)
 {
-    return float3((S * g_ReprojectInfoFromInt.xy + g_ReprojectInfoFromInt.zw)*z, z);
+    return float3((S * g_ReprojectInfoHalfResFromInt.xy + g_ReprojectInfoHalfResFromInt.zw)*z, z);
 }
 
 /** Reconstructs screen-space unit normal from screen-space position */
@@ -109,13 +110,6 @@ float2 tapLocation(int sampleNumber, float spinAngle, out float ssR)
     float sin_v, cos_v;
     sincos(angle, sin_v, cos_v);
     return float2(cos_v, sin_v);
-}
-
-
-/** Used for packing Z into the GB channels */
-float CSZToKey(float z)
-{
-    return clamp(z * (1.0 / FAR_PLANE_Z), 0.0, 1.0);
 }
 
 /** Read the camera-space position of the point at screen-space pixel ssP */
@@ -166,44 +160,22 @@ float sampleAO(in int2 ssC, in float3 C, in float3 n_C, in float ssDiskRadius, i
 
     const float epsilon = 0.02f;
     float f = max(radius2 - vv, 0.0);
-    return f * f * f * max((vn - bias) / (epsilon + vv), 0.0);
+    return f * f * f * max((vn - bias) * rcp(epsilon + vv), 0.0);
 }
 
-
-/** Used for packing Z into the GB channels */
-void packKey(float key, out float2 p)
-{
-    // Round to the nearest 1/256.0
-    float temp = floor(key * 256.0);
-    // Integer part
-    p.x = temp * (1.0 / 256.0);
-    // Fractional part
-    p.y = key * 256.0 - temp;
-}
-
-float unpackKey(float2 p)
-{
-    return p.x * (256.0 / 257.0) + p.y * (1.0 / 257.0);
-}
-
-#define visibility      output.r
-#define bilateralKey    output.gb
-
-
-float4 SSAOCalculate(VS_OUTPUT_POSTFX i) : SV_Target
+float2 SSAOCalculate(VS_OUTPUT_POSTFX i) : SV_Target
 {
     float2 vPos = i.position.xy;
     
     // Pixel being shaded 
     int2 ssC = vPos;
 
-    float4 output = float4(1,1,1,1);
+    float2 output = float2(1,1);
 
     // World space point being shaded
     float3 C = getPosition(ssC);
 
-    float zKey = CSZToKey(C.z);
-    packKey(zKey, bilateralKey);
+    output.g = C.z;
 
     bool earlyOut = C.z > FAR_PLANE_Z || C.z < 0.4f || any(ssC < 8) || any(ssC >= (g_ScreenSize.xy - 8));
     [branch]
@@ -212,18 +184,16 @@ float4 SSAOCalculate(VS_OUTPUT_POSTFX i) : SV_Target
         return output;
     }
 
-    float2 diffVector = InputTextureMotion.Load(int3(ssC, 0));
-    float4 prevFrame = InputTextureSSAO.SampleLevel(pointSampler, i.uv+diffVector, 0);
-    float keyPrevFrame = unpackKey(prevFrame.gb);
+    float2 diffVector = InputTextureMotion.SampleLevel(linearSampler, i.uv, 0);
+    float2 prevFrame = InputTextureSSAO.SampleLevel(linearSampler, i.uv+diffVector, 0);
+    float keyPrevFrame = prevFrame.g;
     float aoPrevFrame = prevFrame.r;
 
     // Hash function used in the HPG12 AlchemyAO paper
     float randomPatternRotationAngle = (3 * ssC.x ^ ssC.y + ssC.x * ssC.y) * 10 + g_SSAOPhase;
 
-    // Reconstruct normals from positions. These will lead to 1-pixel black lines
-    // at depth discontinuities, however the blur will wipe those out so they are not visible
-    // in the final image.
-    float3 n_C = reconstructCSFaceNormal(C);
+    float3 normalsWS = InputTextureNormals.Load(int3(ssC, 0)).xyz * 2.0f - 1.0f;
+    float3 n_C = mul(g_ViewMatrix, float4(normalsWS, 0.0f)).xyz * float3(-1,1,1);
 
     // Choose the screen-space sample radius
     float ssDiskRadius = projScale * radius / max(C.z,0.1f);
@@ -239,21 +209,21 @@ float4 SSAOCalculate(VS_OUTPUT_POSTFX i) : SV_Target
     const float temp = radius2 * radius;
     sum /= temp * temp;
 
-    float A = max(0.0f, 1.0f - sum * 1.0f * (5.0f / NUM_SAMPLES));
+    float A = max(0.0f, 1.0f - sum * 1.0f * (4.0f / NUM_SAMPLES));
 
     // bilat filter 1-pixel wide for "free"
-	if (abs(ddx_fine(C.z)) < 0.1f) 
+	if (abs(ddx_fine(C.z)) < 0.2f) 
     {
 		A -= ddx_fine(A) * ((ssC.x & 1) - 0.5);
 	}
-    if (abs(ddx_fine(C.z)) < 0.1f)
+    if (abs(ddx_fine(C.z)) < 0.2f)
     {
 		A -= ddy_fine(A) * ((ssC.y & 1) - 0.5);
 	}
-    visibility = lerp(A, 1.0f, 1.0f - saturate(0.5f * C.z)); // this algorithm has problems with near surfaces... lerp it out smoothly
+    output.r = lerp(A, 1.0f, 1.0f - saturate(0.5f * C.z)); // this algorithm has problems with near surfaces... lerp it out smoothly
 
-    float difference = saturate(1.0f - 200*abs(zKey-keyPrevFrame));
-    visibility = lerp(visibility, aoPrevFrame, 0.95f*difference);
+    float difference = saturate(1.0f - 5 * abs(C.z - keyPrevFrame));
+    output.r = lerp(output.r, aoPrevFrame, 0.95f*difference);
 
     return output;
 }
@@ -272,60 +242,44 @@ from using small numbers of sample taps.
 #define SCALE               (2)
 
 /** Filter radius in pixels. This will be multiplied by SCALE. */
-#define R                   (3)
+#define R                   (2)
 
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 
-/** Type of data to read from source.  This macro allows
-the same blur shader to be used on different kinds of input data. */
-#define VALUE_TYPE        float
-
-/** Swizzle to use to extract the channels of source. This macro allows
-the same blur shader to be used on different kinds of input data. */
-#define VALUE_COMPONENTS   r
-
-#define VALUE_IS_KEY       0
-
-/** Channel encoding the bilateral key value (which must not be the same as VALUE_COMPONENTS) */
-#define KEY_COMPONENTS     gb
-
 // Gaussian coefficients
 static const float gaussian[] =
 //	{ 0.356642, 0.239400, 0.072410, 0.009869 };
 //	{ 0.398943, 0.241971, 0.053991, 0.004432, 0.000134 };  // stddev = 1.0
-//    { 0.153170, 0.144893, 0.122649, 0.092902, 0.062970 };  // stddev = 2.0
-{ 0.111220, 0.107798, 0.098151, 0.083953, 0.067458, 0.050920, 0.036108 }; // stddev = 3.0
-
-#define  result         output.VALUE_COMPONENTS
-#define  keyPassThrough output.KEY_COMPONENTS
+  { 0.153170, 0.144893, 0.122649, 0.092902, 0.062970 };  // stddev = 2.0
+//  { 0.111220, 0.107798, 0.098151, 0.083953, 0.067458, 0.050920, 0.036108 }; // stddev = 3.0
 
 
-float4 BlurSSAO(VS_OUTPUT_POSTFX i) : SV_Target
+float2 BlurSSAO(VS_OUTPUT_POSTFX i) : SV_Target
 {
     float2 vPos = i.position.xy;
 
     // Pixel being shaded 
     int2 ssC = vPos;
 
-    float4 output = 1.0f;
+    float2 output = 1.0f;
 
-    float4 temp = InputTextureSSAO.Load(int3(ssC, 0));
+    float2 temp = InputTextureSSAO.Load(int3(ssC, 0));
 
 #ifdef HORIZONTAL
-    keyPassThrough = temp.KEY_COMPONENTS;
+    output.g = temp.g;
 #endif
 
-    float key = unpackKey(temp.KEY_COMPONENTS);
+    float key = temp.g;
 
-    float sum = temp.VALUE_COMPONENTS;
+    float sum = temp.r;
 
     [branch]
     if (key == 1.0)
     {
         // Sky pixel (if you aren't using depth keying, disable this test)
-        result = sum;
+        output.r = sum;
         return output;
     }
 
@@ -345,14 +299,14 @@ float4 BlurSSAO(VS_OUTPUT_POSTFX i) : SV_Target
             float2 axis = float2(0, 1);
 #endif
             temp = InputTextureSSAO.Load(int3(ssC + axis * (r * SCALE), 0));
-            float tapKey = unpackKey(temp.KEY_COMPONENTS);
-            float value = temp.VALUE_COMPONENTS;
+            float tapKey = temp.g;
+            float value = temp.r;
 
             // spatial domain: offset gaussian tap
             float weight = gaussian[abs(r)];
 
             // range domain (the "bilateral" weight). As depth difference increases, decrease weight.
-            weight *= max(0.0, 1.0 - (2000.0 * EDGE_SHARPNESS) * abs(tapKey - key));
+            weight *= max(0.0, 1.0 - (20.0 * EDGE_SHARPNESS) * abs(tapKey - key));
 
             sum += value * weight;
             totalWeight += weight;
@@ -360,7 +314,7 @@ float4 BlurSSAO(VS_OUTPUT_POSTFX i) : SV_Target
     }
 
     const float epsilon = 0.0001;
-    result = sum / (totalWeight + epsilon);
+    output.r = sum / (totalWeight + epsilon);
 
     return output;
 }

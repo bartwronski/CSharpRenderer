@@ -206,13 +206,13 @@ namespace CSharpRenderer
 
             ShaderResourceViewDescription srvViewDesc = new ShaderResourceViewDescription
             {
-                ArraySize = 6,
                 Format = srvFormat,
-                Dimension = ShaderResourceViewDimension.Texture2DArray,
+                Dimension = ShaderResourceViewDimension.TextureCube,
                 Flags = 0,
                 FirstArraySlice = 0,
                 MostDetailedMip = 0,
-                MipLevels = mips
+                MipLevels = mips,
+                ArraySize = 6,
             };
 
             newTexture.m_ShaderResourceView = new ShaderResourceView(device, newTexture.m_TextureObject2D, srvViewDesc);
@@ -261,12 +261,17 @@ namespace CSharpRenderer
                     Format = format,
                 };
 
-                newTexture.m_ArrayRenderTargetViews = new RenderTargetView[6];
-                for (int i = 0; i < 6; ++i)
+                newTexture.m_ArrayRenderTargetViews = new RenderTargetView[6 * mips];
+                
+                for (int m = 0; m < mips; ++m)
                 {
-                    rtvDesc.ArraySize = 1;
-                    rtvDesc.FirstArraySlice = i;
-                    newTexture.m_ArrayRenderTargetViews[i] = new RenderTargetView(device, newTexture.m_TextureObject2D, rtvDesc);
+                    for (int i = 0; i < 6; ++i)
+                    {
+                        rtvDesc.MipSlice = m;
+                        rtvDesc.ArraySize = 1;
+                        rtvDesc.FirstArraySlice = i;
+                        newTexture.m_ArrayRenderTargetViews[6 * m + i] = new RenderTargetView(device, newTexture.m_TextureObject2D, rtvDesc);
+                    }
                 }
 
                 UnorderedAccessViewDescription uavDesc = new UnorderedAccessViewDescription
@@ -278,12 +283,16 @@ namespace CSharpRenderer
                 };
                 newTexture.m_UnorderedAccessView = new UnorderedAccessView(device, newTexture.m_TextureObject2D, uavDesc);
 
-                newTexture.m_ArrayUnorderedAccessViews = new UnorderedAccessView[6];
-                for (int i = 0; i < 6; ++i)
+                newTexture.m_ArrayUnorderedAccessViews = new UnorderedAccessView[6 * mips];
+                for (int m = 0; m < mips; ++m)
                 {
-                    uavDesc.ArraySize = 1;
-                    uavDesc.FirstArraySlice = i;
-                    newTexture.m_ArrayUnorderedAccessViews[i] = new UnorderedAccessView(device, newTexture.m_TextureObject2D, uavDesc);
+                    for (int i = 0; i < 6; ++i)
+                    {
+                        uavDesc.ArraySize = 1;
+                        uavDesc.FirstArraySlice = i;
+                        uavDesc.MipSlice = m;
+                        newTexture.m_ArrayUnorderedAccessViews[6 * m + i] = new UnorderedAccessView(device, newTexture.m_TextureObject2D, uavDesc);
+                    }
                 }
             }
 

@@ -22,6 +22,7 @@ namespace CSharpRenderer
         public static double m_Time;
         public static int m_ClickedX;
         public static int m_ClickedY;
+        public static bool m_TakeSnapshot;
 
         static Dictionary<CustomConstantBufferDefinition.ConstantBufferPropertyField, Tuple<TrackBar, TextBox>> m_PropertyControlBindings;
 
@@ -61,7 +62,8 @@ namespace CSharpRenderer
             PostEffectHelper.Initialize(device, ResolutionX, ResolutionY);
             CubemapRenderHelper.Initialize(device);
             PerlinNoiseRenderHelper.Initialize(device, device.ImmediateContext);
-            SurfaceDebugManager.Initialize(device, ResolutionX, ResolutionY);
+            LightingLUTHelper.Initialize(device, device.ImmediateContext);
+            DebugManager.Initialize(device, ResolutionX, ResolutionY);
 
             InitializeControls(form);
 
@@ -109,7 +111,7 @@ namespace CSharpRenderer
 
                 scene.RenderFrame(context, timeDelta, resolvedRenderTarget);
                 now = DateTime.Now;
-                SurfaceDebugManager.PresentDebug(context, resolvedRenderTarget);
+                DebugManager.PresentDebug(context, resolvedRenderTarget);
                 context.CopyResource(resolvedRenderTarget.m_RenderTargets[0].m_TextureObject2D, swapChainResource);
                 GPUProfiler.EndFrameProfiling(context);
                 swapChain.Present(0, PresentFlags.None);
@@ -176,9 +178,11 @@ namespace CSharpRenderer
             Random rand = new Random();
 
             gfcb.g_Time = (float)m_Time;
-            gfcb.g_FrameRandoms = new Vector4((float)rand.NextDouble(), (float)rand.NextDouble(), (float)rand.NextDouble(), (float)rand.NextDouble());
+            if (!form.GetFreezeTime())
+                gfcb.g_FrameRandoms = new Vector4((float)rand.NextDouble(), (float)rand.NextDouble(), (float)rand.NextDouble(), (float)rand.NextDouble());
+
             gfcb.g_FrameNumber = m_FrameNumber;
-            gfcb.g_GPUDebugOn = SurfaceDebugManager.m_GPUDebugOn ? 1.0f : 0.0f;
+            gfcb.g_GPUDebugOn = DebugManager.m_GPUDebugOn ? 1.0f : 0.0f;
             gfcb.g_GPUDebugOverridePositionEnable = form.GetGPUDebuggingOverridePos() ? 1.0f : 0.0f;
             gfcb.g_GPUDebugOverridePositionXYZ = new Vector4((float)form.GetGPUDebuggingOverridePosX(), (float)form.GetGPUDebuggingOverridePosY(), (float)form.GetGPUDebuggingOverridePosZ(), 0.0f);
             globalFrameConstantBuffer.CompileAndBind(context);
@@ -188,32 +192,59 @@ namespace CSharpRenderer
         {
             ComboBox cb = form.GetDebugSurface();
             ComboBox cbM = form.GetDebugMode();
-            if (SurfaceDebugManager.m_IsUIRebuildRequired)
+            CheckedListBox features = form.GetFeatureCLB();
+            if (DebugManager.m_IsUIRebuildRequired)
             {
                 cb.Items.Clear();
-                cb.Items.AddRange(SurfaceDebugManager.m_AvailableModes.ToArray());
+                cb.Items.AddRange(DebugManager.m_AvailableModes.ToArray());
 
-                SurfaceDebugManager.m_IsUIRebuildRequired = false;
+                features.Items.Clear();
+
+                foreach (var pair in DebugManager.m_AvailableFeatures)
+                {
+                    features.Items.Add(pair.Key, pair.Value);
+                }
+
+                DebugManager.m_IsUIRebuildRequired = false;
                 cbM.SelectedIndex = 0;
                 cb.SelectedIndex = 0;
             }
 
             if (cb.SelectedIndex >= 0 && form.GetDebugModeOn())
             {
-                SurfaceDebugManager.m_CurrentDebugSurface = (string)cb.Items[cb.SelectedIndex];
-                SurfaceDebugManager.m_CurrentDebugMode = cbM.SelectedIndex > 0 ? (string)cbM.Items[cbM.SelectedIndex] : "RGB";
+                DebugManager.m_CurrentDebugSurface = (string)cb.Items[cb.SelectedIndex];
+                DebugManager.m_CurrentDebugMode = cbM.SelectedIndex > 0 ? (string)cbM.Items[cbM.SelectedIndex] : "RGB";
             }
             else
             {
-                SurfaceDebugManager.m_CurrentDebugSurface = "None";
+                DebugManager.m_CurrentDebugSurface = "None";
             }
 
-            if (SurfaceDebugManager.m_GPUDebugOn)
+            if (m_TakeSnapshot)
             {
-                form.GetGPUDebuggingTB().Text = SurfaceDebugManager.GetDebugString(context);
+                DebugManager.m_TakeSnapshot = true;
+                m_TakeSnapshot = false;
+            }
+
+            int counter = 0;
+            string[] featuresArrayCopy = new string[DebugManager.m_AvailableFeatures.Keys.Count];
+            DebugManager.m_AvailableFeatures.Keys.CopyTo(featuresArrayCopy, 0);
+            foreach (var key in featuresArrayCopy)
+            {
+                bool uiValue = features.GetItemChecked(counter++);
+                DebugManager.m_AvailableFeatures[key] = uiValue;
+            }
+
+            DebugManager.m_ShowSnapshot = form.GetShowSnapshot();
+            DebugManager.m_ShowSnapshotDifference = form.GetShowSnapshotDifference();
+
+            if (DebugManager.m_GPUDebugOn)
+            {
+                form.GetGPUDebuggingTB().Text = DebugManager.GetDebugString(context);
             }
             
-            SurfaceDebugManager.SetGPUDebugMode(form.GetGPUDebugModeOn());
+            DebugManager.SetGPUDebugMode(form.GetGPUDebugModeOn());
+            DebugManager.m_DisabledTemporal = form.GetDisabledTemporal();
         }
 
         private static void UpdateControls()

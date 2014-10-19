@@ -130,14 +130,14 @@ namespace CSharpRenderer
             }
             else
             {
-                if (SurfaceDebugManager.m_GPUDebugOn)
+                if (DebugManager.m_GPUDebugOn)
                 {
                     UnorderedAccessView[] unorderedAccessViewsDebug = new UnorderedAccessView[1];
-                    unorderedAccessViewsDebug[0] = SurfaceDebugManager.m_DebugAppendBuffer.m_UnorderedAccessView;
+                    unorderedAccessViewsDebug[0] = DebugManager.m_DebugAppendBuffer.m_UnorderedAccessView;
 
                     int[] initialLenghts = new int[1];
-                    initialLenghts[0] = SurfaceDebugManager.m_FirstCallThisFrame ? 0 : -1;
-                    SurfaceDebugManager.m_FirstCallThisFrame = false;
+                    initialLenghts[0] = DebugManager.m_FirstCallThisFrame ? 0 : -1;
+                    DebugManager.m_FirstCallThisFrame = false;
 
                     context.OutputMerger.SetTargets(depth ? m_DepthStencil.m_DepthStencilView : null, 7, unorderedAccessViewsDebug, initialLenghts, color ? renderTargetViews : null);
                 }

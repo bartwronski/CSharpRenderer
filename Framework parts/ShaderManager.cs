@@ -1,20 +1,16 @@
-﻿using SlimDX;
-using SlimDX.D3DCompiler;
+﻿using SlimDX.D3DCompiler;
 using SlimDX.Direct3D11;
-using SlimDX.DXGI;
-using SlimDX.Windows;
 using Device = SlimDX.Direct3D11.Device;
-using Resource = SlimDX.Direct3D11.Resource;
 using System.IO;
-using Math = System.Math;
 using String = System.String;
 using System;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Globalization;
-using System.Security.Cryptography;
 using System.Collections.Generic;
 using System.Security.Permissions;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace CSharpRenderer
 {
@@ -28,19 +24,25 @@ namespace CSharpRenderer
             GeometryShader,
         }
 
+        class ShaderFile
+        {
+            public string m_FileName;
+            public string m_FilePath;
+            public List<String> m_DirectlyIncludedFiles;
+            public HashSet<String> m_FlattenedFiles;
+        }
+
         class ShaderWrapper
         {
             public ShaderType m_ShaderType;
             public string m_ShaderName;
             public string m_ShaderEntry;
-            public string m_FilePath;
-            public HashSet<string> m_UsedIncludes;
-            public PixelShader m_PixelShader;
-            public VertexShader m_VertexShader;
-            public GeometryShader m_GeometryShader;
-            public ComputeShader m_ComputeShader;
+            public ShaderFile m_ShaderFile;
+            public DeviceChild m_ShaderObject;
+            public ShaderBytecode m_ShaderBytecode;
             public ShaderSignature m_VertexInputSignature;
             public HashSet<string> m_Defines;
+            public Task m_ShaderCompilationTask;
             public int m_ThreadsX;
             public int m_ThreadsY;
             public int m_ThreadsZ;
@@ -59,7 +61,6 @@ namespace CSharpRenderer
             public void Open(IncludeType type, string fileName, Stream parentStream, out Stream stream)
             {
                 stream = new FileStream(includeDirectory + fileName, FileMode.Open, FileAccess.Read);
-                m_CurrentlyProcessedShader.m_UsedIncludes.Add(Directory.GetCurrentDirectory() + "\\shaders\\" + fileName);
             }
         }
 
@@ -72,10 +73,8 @@ namespace CSharpRenderer
         static object m_Lock;
         static HashSet<string> m_FilesToReload;
         static Dictionary<string, float> m_GlobalDefineValues;
-
-        // hack for ugly IncludeFX :( 
-        static ShaderWrapper m_CurrentlyProcessedShader;
-
+        static Dictionary<string, ShaderFile> m_AllShaderFiles;
+        
         class RegexWrapper
         {
             public Regex shaderRegex;
@@ -85,6 +84,7 @@ namespace CSharpRenderer
             public Regex registerRegex;
             public Regex globalBufferRegex;
             public Regex globalDefineRegex;
+            public Regex includeRegex;
 
             public RegexWrapper()
             {
@@ -95,6 +95,7 @@ namespace CSharpRenderer
                 registerRegex = new Regex(@"register\(b([\d]+)\)", RegexOptions.IgnoreCase);
                 globalBufferRegex = new Regex(@"//[ \t]*Global", RegexOptions.IgnoreCase);
                 globalDefineRegex = new Regex(@"#define[ \t]*(\w+)[ \t]*([\d.f]+)[ \t]*//[ \t]*GlobalDefine", RegexOptions.IgnoreCase);
+                includeRegex = new Regex(@"#include[ \t]*""([\w.]+)""", RegexOptions.IgnoreCase);
             }
         };
         static ShaderManager()
@@ -103,12 +104,12 @@ namespace CSharpRenderer
             m_Shaders = new Dictionary<string, ShaderWrapper>();
             m_ConstantBuffers = new Dictionary<string, CustomConstantBufferDefinition>();
             m_Watchers = new List<FileSystemWatcher>();
-            m_CurrentlyProcessedShader = null;
             m_SamplerStates = new Dictionary<int, SamplerState>();
             m_Lock = new Object();
             m_FilesToReload = new HashSet<string>();
             m_RegexWrapper = new RegexWrapper();
             m_GlobalDefineValues = new Dictionary<string, float>();
+            m_AllShaderFiles = new Dictionary<String, ShaderFile>();
         }
 
         static RegexWrapper m_RegexWrapper;
@@ -141,17 +142,81 @@ namespace CSharpRenderer
             CultureInfo ci = new CultureInfo("en-US", false);
             string[] filePaths = filters.SelectMany(f => Directory.GetFiles(Directory.GetCurrentDirectory() + "\\shaders", f)).ToArray();
 
+            foreach (string path in filePaths)
+            {
+                string fileName = GetFileNameFromPath(path);
+                ShaderFile sf = new ShaderFile();
+                sf.m_DirectlyIncludedFiles = new List<String>();
+                sf.m_FileName = fileName;
+                sf.m_FilePath = path;
+                sf.m_FlattenedFiles = new HashSet<String>();
+                
+                m_AllShaderFiles.Add(fileName, sf);
+            }
 
             foreach (string path in filePaths)
             {
-                ParseFile(device, path);
+                ParseFile(path);
+            }
+            FlattenIncludes();
+            FinalizeCompilationOnDevice(device);
+        }
+
+        private static String GetFileNameFromPath(string path)
+        {
+            string[] splitPath = path.Split(new char[] { '\\' }, StringSplitOptions.RemoveEmptyEntries);
+            string fileName = splitPath[splitPath.Length - 1];
+            return fileName;
+        }
+
+        private static void FlattenIncludes()
+        {
+            bool includesChanged = true;
+            
+            while(includesChanged)
+            {
+                includesChanged = false;
+                foreach(var sf in m_AllShaderFiles.Values)
+                {
+                    int includeCount = sf.m_FlattenedFiles.Count;
+                    var newIncludes = new HashSet<String>();
+
+                    foreach (var include in sf.m_FlattenedFiles)
+                    {
+                        newIncludes.UnionWith(m_AllShaderFiles[include].m_FlattenedFiles);
+                    }
+                    sf.m_FlattenedFiles.UnionWith(newIncludes);
+
+                    if (sf.m_FlattenedFiles.Count != includeCount)
+                    {
+                        includesChanged = true;
+                    }
+                }
             }
         }
 
-        private static void ParseFile(Device device, string path)
+        private static void FinalizeCompilationOnDevice(Device device)
+        {
+            foreach (var shader in m_Shaders.Values)
+            {
+                if (shader.m_ShaderCompilationTask != null)
+                {
+                    shader.m_ShaderCompilationTask.Wait();
+                    shader.m_ShaderCompilationTask.Dispose();
+                    shader.m_ShaderCompilationTask = null;
+
+                    FinalizeShader(shader, device);
+                }
+            }
+        }
+
+        private static void ParseFile(string path)
         {
             List<ShaderWrapper> localShaders = new List<ShaderWrapper>();
             List<Tuple<string, int, int, int>> computeRegisters = new List<Tuple<String, int, int, int>>();
+            ShaderFile sf = m_AllShaderFiles[GetFileNameFromPath(path)];
+            sf.m_DirectlyIncludedFiles.Clear();
+            sf.m_FlattenedFiles.Clear();
 
             using (StreamReader sr = new StreamReader(path))
             {
@@ -163,6 +228,13 @@ namespace CSharpRenderer
                     Match matchSamplerRegex = m_RegexWrapper.samplerRegex.Match(line);
                     Match matchNumThreadsRegex = m_RegexWrapper.numThreadsRegex.Match(line);
                     Match matchGlobalDefineRegex = m_RegexWrapper.globalDefineRegex.Match(line);
+                    Match matchIncludeRegex = m_RegexWrapper.includeRegex.Match(line);
+
+                    if (matchIncludeRegex.Success)
+                    {
+                        string includeName = matchIncludeRegex.Groups[1].Value;
+                        sf.m_DirectlyIncludedFiles.Add(includeName);
+                    }
 
                     if (matchGlobalDefineRegex.Success)
                     {
@@ -261,11 +333,10 @@ namespace CSharpRenderer
 
                         ShaderWrapper newShader = new ShaderWrapper()
                         {
-                            m_FilePath = path,
+                            m_ShaderFile = sf,
                             m_ShaderName = shaderName,
                             m_ShaderType = type,
                             m_ShaderEntry = shaderEntry,
-                            m_UsedIncludes = new HashSet<String>(),
                             m_Defines = defines
                         };
 
@@ -298,8 +369,24 @@ namespace CSharpRenderer
 
             foreach (var shader in localShaders)
             {
-                CompileShader(shader, device);
+                if (m_Shaders.ContainsKey(shader.m_ShaderName))
+                {
+                    m_Shaders[shader.m_ShaderName] = shader;
+                }
+                else
+                {
+                    m_Shaders.Add(shader.m_ShaderName, shader);
+                }
+
+                // CompileShader(shader);
+                if (shader.m_ShaderCompilationTask != null)
+                    throw new Exception("Already compiling");
+
+                shader.m_ShaderCompilationTask = Task.Factory.StartNew(() => CompileShader(shader));
             }
+
+            sf.m_FlattenedFiles.Add(sf.m_FileName);
+            sf.m_FlattenedFiles.UnionWith(sf.m_DirectlyIncludedFiles);
 
             foreach (var registers in computeRegisters)
             {
@@ -339,10 +426,10 @@ namespace CSharpRenderer
 
         private static void BindDebugUAV(DeviceContext context)
         {
-            if (SurfaceDebugManager.m_GPUDebugOn)
+            if (DebugManager.m_GPUDebugOn)
             {
-                context.ComputeShader.SetUnorderedAccessView(SurfaceDebugManager.m_DebugAppendBuffer.m_UnorderedAccessView, 7, SurfaceDebugManager.m_FirstCallThisFrame ? 0 : -1);
-                SurfaceDebugManager.m_FirstCallThisFrame = false;
+                context.ComputeShader.SetUnorderedAccessView(DebugManager.m_DebugAppendBuffer.m_UnorderedAccessView, 7, DebugManager.m_FirstCallThisFrame ? 0 : -1);
+                DebugManager.m_FirstCallThisFrame = false;
             }
         }
 
@@ -351,7 +438,7 @@ namespace CSharpRenderer
             BindDebugUAV(context);
 
             ShaderWrapper wrapper = m_Shaders[shader];
-            context.ComputeShader.Set(wrapper.m_ComputeShader);
+            context.ComputeShader.Set((ComputeShader)wrapper.m_ShaderObject);
             context.Dispatch(
                 (textureResource.m_Width + wrapper.m_ThreadsX - 1) / wrapper.m_ThreadsX,
                 (textureResource.m_Height + wrapper.m_ThreadsY - 1) / wrapper.m_ThreadsY,
@@ -363,7 +450,7 @@ namespace CSharpRenderer
             BindDebugUAV(context);
 
             ShaderWrapper wrapper = m_Shaders[shader];
-            context.ComputeShader.Set(wrapper.m_ComputeShader);
+            context.ComputeShader.Set((ComputeShader)wrapper.m_ShaderObject);
             context.Dispatch(
                 (x + wrapper.m_ThreadsX - 1) / wrapper.m_ThreadsX,
                 (y + wrapper.m_ThreadsY - 1) / wrapper.m_ThreadsY,
@@ -391,11 +478,32 @@ namespace CSharpRenderer
             return m_ConstantBuffers.Values.ToList();
         }
 
-        private static void CompileShader(ShaderWrapper shader, Device device)
+        private static void FinalizeShader(ShaderWrapper shader, Device device)
         {
-            // hack to add includes to list to allow easy reloading after include has changed...
-            m_CurrentlyProcessedShader = shader;
+            switch (shader.m_ShaderType)
+            {
+                case ShaderType.PixelShader:
+                    shader.m_ShaderObject = new PixelShader(device, shader.m_ShaderBytecode);
+                    break;
+                case ShaderType.ComputeShader:
+                    shader.m_ShaderObject = new ComputeShader(device, shader.m_ShaderBytecode);
+                    break;
+                case ShaderType.GeometryShader:
+                    shader.m_ShaderObject = new GeometryShader(device, shader.m_ShaderBytecode);
+                    break;
+                case ShaderType.VertexShader:
+                    shader.m_VertexInputSignature = ShaderSignature.GetInputSignature(shader.m_ShaderBytecode);
+                    shader.m_ShaderObject = new VertexShader(device, shader.m_ShaderBytecode);
+                    break;
+            }
+            shader.m_ShaderBytecode.Dispose();
+            shader.m_ShaderBytecode = null;
+        }
+
+        private static void CompileShader(ShaderWrapper shader)
+        {
             bool done = false;
+            bool acquiredLock = false;
             while (!done)
             {
                 try
@@ -407,68 +515,62 @@ namespace CSharpRenderer
                         defines[counter++] = new ShaderMacro(define, "1");
                     }
 
+                    string profile = "";
+
                     switch (shader.m_ShaderType)
                     {
                         case ShaderType.PixelShader:
-                            using (var bytecode = ShaderBytecode.CompileFromFile(shader.m_FilePath, shader.m_ShaderEntry, "ps_5_0", ShaderFlags.WarningsAreErrors, EffectFlags.None, defines, m_Include))
-                                shader.m_PixelShader = new PixelShader(device, bytecode);
+                            profile = "ps_5_0";
                             break;
                         case ShaderType.ComputeShader:
-                            using (var bytecode = ShaderBytecode.CompileFromFile(shader.m_FilePath, shader.m_ShaderEntry, "cs_5_0", ShaderFlags.WarningsAreErrors, EffectFlags.None, defines, m_Include))
-                                shader.m_ComputeShader = new ComputeShader(device, bytecode);
+                            profile = "cs_5_0";
                             break;
                         case ShaderType.GeometryShader:
-                            using (var bytecode = ShaderBytecode.CompileFromFile(shader.m_FilePath, shader.m_ShaderEntry, "gs_5_0", ShaderFlags.WarningsAreErrors, EffectFlags.None, defines, m_Include))
-                                shader.m_GeometryShader = new GeometryShader(device, bytecode);
+                            profile = "gs_5_0";
                             break;
                         case ShaderType.VertexShader:
-                            using (var bytecode = ShaderBytecode.CompileFromFile(shader.m_FilePath, shader.m_ShaderEntry, "vs_5_0", ShaderFlags.WarningsAreErrors, EffectFlags.None, defines, m_Include))
-                            {
-                                shader.m_VertexInputSignature = ShaderSignature.GetInputSignature(bytecode);
-                                shader.m_VertexShader = new VertexShader(device, bytecode);
-                            }
+                            profile = "vs_5_0";
                             break;
                     }
+                    shader.m_ShaderBytecode = ShaderBytecode.CompileFromFile(shader.m_ShaderFile.m_FilePath, shader.m_ShaderEntry, profile, ShaderFlags.WarningsAreErrors, EffectFlags.None, defines, m_Include);
 
                     done = true;
                 }
                 catch (Exception e)
                 {
-                    System.Windows.Forms.MessageBox.Show(e.Message, "Shader compilation error");
+                    // if error - we need to enter synchronized state
+                    if (!acquiredLock)
+                    {
+                        System.Threading.Monitor.TryEnter(m_Lock, ref acquiredLock);
+                    }
+
+                    // if we are first to aquire lock - show message box, allowing user to fix shader
+                    if (acquiredLock)
+                    {
+                        System.Windows.Forms.MessageBox.Show(e.Message, "Shader compilation error");
+                    }
+                    else
+                    {
+                        // otherwise just enter without showing mb, will retry compilation after first shader is fixed
+                        System.Threading.Monitor.Enter(m_Lock, ref acquiredLock);
+                    }
                 }
             }
-            m_CurrentlyProcessedShader = null;
 
-            if (m_Shaders.ContainsKey(shader.m_ShaderName))
+            if (acquiredLock)
             {
-                m_Shaders[shader.m_ShaderName] = shader;
-            }
-            else
-            {
-                m_Shaders.Add(shader.m_ShaderName, shader);
+                System.Threading.Monitor.Exit(m_Lock);
             }
         }
 
         private static void OnFileChanged(object source, FileSystemEventArgs e)
         {
-            bool contains = m_ConstantBuffers.Values.Where
-                (cb => cb.m_FilePath == e.FullPath)
-                .Count() > 0
-                ||
-                m_Shaders.Values.Where
-                (shader => shader.m_FilePath == e.FullPath)
-                .Count() > 0;
             var shadersUsingInclude = m_Shaders.Values.Where
-                (shader => shader.m_UsedIncludes.Contains(e.FullPath));
-
+                (shader => shader.m_ShaderFile.m_FlattenedFiles.Contains(e.Name));
 
             lock (m_Lock)
             {
-                if (contains)
-                {
-                    m_FilesToReload.Add(e.FullPath);
-                }
-                m_FilesToReload.UnionWith(shadersUsingInclude.Select(shader => shader.m_FilePath));
+                m_FilesToReload.UnionWith(shadersUsingInclude.Select(shader => shader.m_ShaderFile.m_FilePath));
             }
         }
 
@@ -486,8 +588,11 @@ namespace CSharpRenderer
             {
                 foreach (var fileToReload in filesToReload)
                 {
-                    ParseFile(device, fileToReload);
+                    ParseFile(fileToReload);
                 }
+
+                FlattenIncludes();
+                FinalizeCompilationOnDevice(device);
 
                 lock (CustomConstantBufferInstance.m_Lock)
                 {
@@ -505,12 +610,12 @@ namespace CSharpRenderer
 
         public static VertexShader GetVertexShader(string name)
         {
-            return m_Shaders[name].m_VertexShader;
+            return (VertexShader)m_Shaders[name].m_ShaderObject;
         }
 
         public static GeometryShader GetGeometryShader(string name)
         {
-            return m_Shaders[name].m_GeometryShader;
+            return (GeometryShader)m_Shaders[name].m_ShaderObject;
         }
 
         public static ShaderSignature GetVertexShaderSignature(string name)
@@ -520,12 +625,12 @@ namespace CSharpRenderer
 
         public static PixelShader GetPixelShader(string name)
         {
-            return m_Shaders[name].m_PixelShader;
+            return (PixelShader)m_Shaders[name].m_ShaderObject;
         }
 
         public static ComputeShader GetComputeShader(string name)
         {
-            return m_Shaders[name].m_ComputeShader;
+            return (ComputeShader)m_Shaders[name].m_ShaderObject;
         }
     }
 }

@@ -19,9 +19,9 @@ namespace CSharpRenderer
         Camera              m_ShadowCamera;
 
         RenderTargetSet.RenderTargetDescriptor m_FullResDescriptor;
+        RenderTargetSet.RenderTargetDescriptor m_HalfResDescriptor;
         RenderTargetSet.RenderTargetDescriptor m_FullResAndDepthDescriptor;
         RenderTargetSet.RenderTargetDescriptor m_ResolvedColorDescriptor;
-        RenderTargetSet.RenderTargetDescriptor m_LinearDepthDescriptor;
         RenderTargetSet.RenderTargetDescriptor m_SSAODescriptor;
 
         SimpleSceneWrapper  m_SimpleSceneWrapper;
@@ -32,9 +32,11 @@ namespace CSharpRenderer
         ResolveMotionVectorsPass        m_ResolveMotionVectorsPass;
         ResolveTemporalMotionBasedPass  m_ResolveTemporalPass;
         SSAOEffectPass                  m_SSAOPass;
+        SSReflectionsEffectPass         m_SSReflectionsPass;
         GlobalIlluminationRenderer      m_GIRenderer;
         LuminanceCalculations           m_LuminanceCalculations;
         ShadowEVSMGenerator             m_ShadowEVSMGenerator;
+        DepthOperationsPass             m_DepthOperationsPass;
         VolumetricFog                   m_VolumetricFog;
 
         RenderTargetSet                 m_ResolvedShadow;
@@ -49,6 +51,10 @@ namespace CSharpRenderer
         CustomConstantBufferInstance m_CurrentViewportBuffer;
         CustomConstantBufferInstance m_ViewportConstantBuffer;
         CustomConstantBufferInstance m_PostEffectsConstantBuffer;
+
+        TextureObject                m_CubeObject;
+        TextureObject                m_CubeObjectFiltered;
+        TextureObject                m_CubeDepthObject;
         
         bool m_ShadowsInitialized;
 
@@ -57,6 +63,7 @@ namespace CSharpRenderer
         public Scene()
         {
             m_ViewportCamera = new Camera();
+            m_ViewportCamera.m_CameraPosition.Y += 1.0f;
             m_ShadowCamera = new Camera(true);
             m_SimpleSceneWrapper = new SimpleSceneWrapper();
             m_ShadowsInitialized = false;
@@ -94,25 +101,27 @@ namespace CSharpRenderer
                 m_Width = resolutionX
             };
 
-            m_LinearDepthDescriptor = new RenderTargetSet.RenderTargetDescriptor()
-            {
-                m_Format = Format.R32_Float,
-                m_HasDepth = false,
-                m_NumSurfaces = 1,
-                m_Height = resolutionY,
-                m_Width = resolutionX
-            };
             m_SSAODescriptor = new RenderTargetSet.RenderTargetDescriptor()
             {
                 m_Format = Format.R8_UNorm,
                 m_HasDepth = false,
                 m_NumSurfaces = 1,
-                m_Height = resolutionY,
-                m_Width = resolutionX
+                m_Height = resolutionY / 2,
+                m_Width = resolutionX / 2
+            };
+
+            m_HalfResDescriptor = new RenderTargetSet.RenderTargetDescriptor()
+            {
+                m_Format = Format.R16G16B16A16_Float,
+                m_HasDepth = false,
+                m_NumSurfaces = 1,
+                m_Height = resolutionY / 2,
+                m_Width = resolutionX / 2
             };
 
             m_SimpleSceneWrapper.Initialize(device, "sponza");
 
+            TemporalSurfaceManager.InitializeRenderTarget("SceneMainRender", m_FullResAndDepthDescriptor);
             TemporalSurfaceManager.InitializeRenderTarget("ResolvedColor", m_ResolvedColorDescriptor );
 
             TemporalSurfaceManager.InitializeRenderTarget("MotionVectors",
@@ -148,7 +157,11 @@ namespace CSharpRenderer
 
             m_FxaaPass = new FxaaPass();
 
-            m_SSAOPass = new SSAOEffectPass(device, resolutionX, resolutionY);
+            m_DepthOperationsPass = new DepthOperationsPass(resolutionX, resolutionY);
+
+            m_SSAOPass = new SSAOEffectPass(device, resolutionX / 2, resolutionY / 2);
+
+            m_SSReflectionsPass = new SSReflectionsEffectPass(device, resolutionX / 2, resolutionY / 2);
 
             m_LuminanceCalculations = new LuminanceCalculations(device, resolutionX, resolutionY);
 
@@ -172,41 +185,26 @@ namespace CSharpRenderer
                     0.674354533289f, 0.286346887653f, 
                     0.347776132801f, 0.734938485879f, 
                 };
+
+            m_CubeObject = TextureObject.CreateCubeTexture(device, 256, 256, 1, Format.R16G16B16A16_Float, false, true);
+            m_CubeObjectFiltered = TextureObject.CreateCubeTexture(device, 256, 256, 7, Format.R16G16B16A16_Float, false, true);
+            m_CubeDepthObject = TextureObject.CreateCubeTexture(device, 256, 256, 1, Format.R32_Typeless, true, true);
         }
 
         public void RenderFrame(DeviceContext context, double timeElapsed, RenderTargetSet targetRT)
         {
             ShaderManager.BindSamplerStates(context);
             PerlinNoiseRenderHelper.BindTextures(context);
-            RenderTargetSet currentFrameMainBuffer = RenderTargetManager.RequestRenderTargetFromPool(m_FullResAndDepthDescriptor);
-            RenderTargetSet linearDepth = RenderTargetManager.RequestRenderTargetFromPool(m_LinearDepthDescriptor);
+            RenderTargetSet currentFrameMainBuffer = TemporalSurfaceManager.GetRenderTargetCurrent("SceneMainRender");
             RenderTargetSet ssaoRT = RenderTargetManager.RequestRenderTargetFromPool(m_SSAODescriptor);
+            bool useTemporal = !DebugManager.m_DisabledTemporal;
 
             if (!m_ShadowsInitialized)
             {
-                m_ShadowCamera.m_CameraForward = new Vector3(-0.15f, -1.0f, 0.15f);
-                m_ShadowCamera.m_CameraForward.Normalize();
-                
-                Vector3 min, max;
-                m_SimpleSceneWrapper.GetSceneBounds(out min, out max);
-
-                Vector3 sceneTop = (min + max) * 0.5f;
-                sceneTop.Y = max.Y;
-
-                m_ShadowCamera.m_OrthoZoomX = (max.X - min.X) * 0.7f; // some overlap
-                m_ShadowCamera.m_OrthoZoomY = (max.Z - min.Z) * 0.7f;
-
-                m_ShadowCamera.m_CameraPosition = sceneTop - m_ShadowCamera.m_CameraForward * 50.0f;
-                m_ShadowCamera.m_CameraUp = new Vector3(0, 0, 1);
+                InitializeShadowmapAndCubemaps(context, timeElapsed);
             }
 
             CalculateAndUpdateConstantBuffer(context, timeElapsed);
-
-            if (!m_ShadowsInitialized)
-            {
-                m_ResolvedShadow = m_ShadowEVSMGenerator.RenderShadows(context, m_SimpleSceneWrapper);
-                m_ShadowsInitialized = true;
-            }
 
             if (false)
             {
@@ -222,7 +220,7 @@ namespace CSharpRenderer
                 context.PixelShader.Set(ShaderManager.GetPixelShader("DepthNormalPrepass"));
 
                 currentFrameMainBuffer.Clear(context, new Color4(1.0f, 1.0f, 1.0f, 1.5f), true);
-                currentFrameMainBuffer.BindAsRenderTarget(context, true, false);
+                currentFrameMainBuffer.BindAsRenderTarget(context, true, true);
                 ContextHelper.SetDepthStencilState(context, ContextHelper.DepthConfigurationType.DepthWriteCompare);
 
                 // render triangles
@@ -231,16 +229,20 @@ namespace CSharpRenderer
                 ContextHelper.SetDepthStencilState(context, ContextHelper.DepthConfigurationType.NoDepth);
 
                 RenderTargetSet.BindNull(context);
+
+                DebugManager.RegisterDebug(context, "NormalsPrepass", currentFrameMainBuffer);
             }
 
             RenderTargetSet motionVectorsSurface = TemporalSurfaceManager.GetRenderTargetCurrent("MotionVectors");
             RenderTargetSet motionVectorsSurfacePrevious = TemporalSurfaceManager.GetRenderTargetHistory("MotionVectors");
             m_ResolveMotionVectorsPass.ExecutePass(context, motionVectorsSurface, currentFrameMainBuffer);
+            DebugManager.RegisterDebug(context, "MotionVectors", motionVectorsSurface);
+            
+            m_DepthOperationsPass.ExecutePass(context, currentFrameMainBuffer);
+            RenderTargetSet linearDepth = m_DepthOperationsPass.m_LinearDepth;
 
-            PostEffectHelper.LinearizeDepth(context, linearDepth, currentFrameMainBuffer);
-            SurfaceDebugManager.RegisterDebug(context, "LinearDepth", linearDepth);
-            m_SSAOPass.ExecutePass(context, ssaoRT, linearDepth, motionVectorsSurface);
-
+            m_SSAOPass.ExecutePass(context, ssaoRT, m_DepthOperationsPass.m_HalfLinearDepth, motionVectorsSurface, m_DepthOperationsPass.m_HalfNormals, m_DepthOperationsPass);
+            m_SSReflectionsPass.ExecutePass(context, m_DepthOperationsPass.m_HalfLinearDepth, motionVectorsSurface, m_DepthOperationsPass.m_HalfNormals, TemporalSurfaceManager.GetRenderTargetHistory("SceneMainRender"), m_ViewportCamera, m_DepthOperationsPass);
             m_VolumetricFog.RenderVolumetricFog(context, m_ResolvedShadow.m_RenderTargets[0], m_GIRenderer);
 
             using (new GpuProfilePoint(context, "MainForwardRender"))
@@ -253,6 +255,8 @@ namespace CSharpRenderer
 
                 m_ResolvedShadow.BindSRV(context, 0);
                 ssaoRT.BindSRV(context, 1);
+                TemporalSurfaceManager.GetRenderTargetCurrent("SSReflections").BindSRV(context, 2);
+                m_DepthOperationsPass.m_BilateralUpsampleOffsets.BindSRV(context, 10);
                 
                 context.PixelShader.SetShaderResource(m_GIRenderer.m_GIVolumeR.m_ShaderResourceView, 5);
                 context.PixelShader.SetShaderResource(m_GIRenderer.m_GIVolumeG.m_ShaderResourceView, 6);
@@ -260,7 +264,11 @@ namespace CSharpRenderer
 
                 context.PixelShader.SetShaderResource(m_VolumetricFog.m_ScatteringTexture.m_ShaderResourceView, 8);
 
+                context.PixelShader.SetShaderResource(m_CubeObjectFiltered.m_ShaderResourceView, 11);
+
                 ContextHelper.SetDepthStencilState(context, ContextHelper.DepthConfigurationType.DepthCompare);
+
+                LightingLUTHelper.BindTextures(context);
 
                 // render triangles
                 m_SimpleSceneWrapper.Render(context);
@@ -272,6 +280,7 @@ namespace CSharpRenderer
 
                 RenderTargetSet.BindNull(context);
             }
+            RenderTargetManager.ReleaseRenderTargetToPool(ssaoRT);
             
             using (new GpuProfilePoint(context, "PostEffects"))
             {
@@ -295,20 +304,56 @@ namespace CSharpRenderer
                 RenderTargetSet resolvedHistory = TemporalSurfaceManager.GetRenderTargetHistory("ResolvedColor");
 
                 m_ResolveHDRPass.ExecutePass(context, resolvedCurrent, source, luminanceTexture);
+                DebugManager.RegisterDebug(context, "ResolvedNoTemporal", resolvedCurrent);
 
                 RenderTargetSet resolvedTemporal = RenderTargetManager.RequestRenderTargetFromPool(m_ResolvedColorDescriptor);
-                m_ResolveTemporalPass.ExecutePass(context, resolvedTemporal, resolvedCurrent, resolvedHistory, motionVectorsSurface, motionVectorsSurfacePrevious, true);
-                SurfaceDebugManager.RegisterDebug(context, "ResolvedNoFXAA", resolvedTemporal);
-                m_FxaaPass.ExecutePass(context, targetRT, resolvedTemporal);
+                RenderTargetSet finalResolvedTarget = resolvedCurrent;
+                if (useTemporal)
+                {
+                    m_ResolveTemporalPass.ExecutePass(context, resolvedTemporal, resolvedCurrent, resolvedHistory, motionVectorsSurface, motionVectorsSurfacePrevious, true);
+                    finalResolvedTarget = resolvedTemporal;
+                }
+
+                DebugManager.RegisterDebug(context, "ResolvedNoFXAA", finalResolvedTarget);
+                m_FxaaPass.ExecutePass(context, targetRT, finalResolvedTarget);
 
                 RenderTargetManager.ReleaseRenderTargetToPool(resolvedTemporal);
                 RenderTargetManager.ReleaseRenderTargetToPool(postEffectSurfacePong);
             }
 
-            RenderTargetManager.ReleaseRenderTargetToPool(ssaoRT);
-            RenderTargetManager.ReleaseRenderTargetToPool(linearDepth);
-            RenderTargetManager.ReleaseRenderTargetToPool(currentFrameMainBuffer);
+        }
 
+        private void InitializeShadowmapAndCubemaps(DeviceContext context, double timeElapsed)
+        {
+
+            m_ShadowCamera.m_CameraForward = new Vector3(-0.15f, -1.0f, 0.15f);
+            m_ShadowCamera.m_CameraForward.Normalize();
+
+            Vector3 min, max;
+            m_SimpleSceneWrapper.GetSceneBounds(out min, out max);
+
+            Vector3 sceneTop = (min + max) * 0.5f;
+            sceneTop.Y = max.Y;
+
+            m_ShadowCamera.m_OrthoZoomX = (max.X - min.X) * 0.7f; // some overlap
+            m_ShadowCamera.m_OrthoZoomY = (max.Z - min.Z) * 0.7f;
+
+            m_ShadowCamera.m_CameraPosition = sceneTop - m_ShadowCamera.m_CameraForward * 50.0f;
+            m_ShadowCamera.m_CameraUp = new Vector3(0, 0, 1);
+
+            CalculateAndUpdateConstantBuffer(context, timeElapsed);
+
+            m_ResolvedShadow = m_ShadowEVSMGenerator.RenderShadows(context, m_SimpleSceneWrapper);
+
+            context.PixelShader.SetShaderResource(m_GIRenderer.m_GIVolumeR.m_ShaderResourceView, 5);
+            context.PixelShader.SetShaderResource(m_GIRenderer.m_GIVolumeG.m_ShaderResourceView, 6);
+            context.PixelShader.SetShaderResource(m_GIRenderer.m_GIVolumeB.m_ShaderResourceView, 7);
+            m_ResolvedShadow.BindSRV(context, 0);
+
+            CubemapRenderHelper.RenderCubemap(context, m_CubeObject, m_CubeDepthObject, m_SimpleSceneWrapper, m_ViewportCamera.m_CameraPosition, 256.0f, false, new Color4(1.0f, 1.0f, 1.0f, 1.5f));
+            CubemapRenderHelper.GenerateCubemapMips(context, "PrefilterEnvLighting", m_CubeObjectFiltered, m_CubeObject);
+
+            m_ShadowsInitialized = true;
         }
 
         private void CalculateAndUpdateConstantBuffer(DeviceContext context, double tick)
@@ -326,11 +371,9 @@ namespace CSharpRenderer
 
             // Temporal component of matrix
             Matrix temporalJitter = Matrix.Identity;
-            if (vcb.g_TemporalAA > 0.5f)
+
+            if (!DebugManager.m_DisabledTemporal)
             {
-                //float translationOffset = (TemporalSurfaceManager.GetCurrentPhase("ResolvedColor") == 0) ? 0.5f : -0.5f;
-                //float translationOffsetX = translationOffset;
-                //float translationOffsetY = translationOffset;
                 temporalJitter = Matrix.Translation((POISSON_SAMPLES[(Program.m_FrameNumber) % POISSON_SAMPLE_NUM * 2 + 0] * 2.0f - 1.0f) / (float)m_ResolutionX, (POISSON_SAMPLES[(Program.m_FrameNumber) % POISSON_SAMPLE_NUM * 2 + 1] * 2.0f - 1.0f) / (float)m_ResolutionY, 0.0f);
             }
             m_ScatterDOFPass.m_DebugBokeh = ppcb.g_DebugBokeh > 0.5f;
@@ -343,6 +386,7 @@ namespace CSharpRenderer
             cvpb.g_ViewMatrix = m_ViewportCamera.m_WorldToView;
             cvpb.g_InvViewProjMatrix = m_ViewportCamera.m_ViewProjectionMatrix;
             cvpb.g_InvViewProjMatrix.Invert();
+            vcb.g_ReprojectProjToPrevFrame = cvpb.g_InvViewProjMatrix * previousFrameViewProjMatrix;
             cvpb.g_ViewProjMatrix = m_ViewportCamera.m_ViewProjectionMatrix * temporalJitter;
 
             Matrix viewToWorldMatrix = m_ViewportCamera.m_WorldToView;
@@ -371,6 +415,13 @@ namespace CSharpRenderer
                 (1.0f - m_ViewportCamera.m_ProjectionMatrix.M13) / m_ViewportCamera.m_ProjectionMatrix.M11,
                 (1.0f + m_ViewportCamera.m_ProjectionMatrix.M23) / m_ViewportCamera.m_ProjectionMatrix.M22);
             vcb.g_ReprojectInfoFromInt = vcb.g_ReprojectInfo + new Vector4(0.0f, 0.0f, vcb.g_ReprojectInfo.X * 0.5f, vcb.g_ReprojectInfo.Y * 0.5f);
+            vcb.g_ReprojectInfoHalfRes = new Vector4(
+                -2.0f / ((float)(m_ResolutionX/2) * m_ViewportCamera.m_ProjectionMatrix.M11),
+                -2.0f / ((float)(m_ResolutionY/2) * m_ViewportCamera.m_ProjectionMatrix.M22),
+                (1.0f - m_ViewportCamera.m_ProjectionMatrix.M13) / m_ViewportCamera.m_ProjectionMatrix.M11,
+                (1.0f + m_ViewportCamera.m_ProjectionMatrix.M23) / m_ViewportCamera.m_ProjectionMatrix.M22);
+            vcb.g_ReprojectInfoHalfResFromInt = vcb.g_ReprojectInfoHalfRes + new Vector4(0.0f, 0.0f, vcb.g_ReprojectInfoHalfRes.X * 0.5f, vcb.g_ReprojectInfoHalfRes.Y * 0.5f);
+
             mcb.g_ShadowViewProjMatrix = m_ShadowCamera.m_ViewProjectionMatrix;
             mcb.g_ShadowInvViewProjMatrix = m_ShadowCamera.m_ViewProjectionMatrix;
             mcb.g_ShadowInvViewProjMatrix.Invert();

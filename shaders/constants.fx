@@ -17,6 +17,7 @@ cbuffer GlobalFrameBuffer : register(b0) // Global
 cbuffer GlobalViewportBuffer : register(b1) // Global
 {
     float4x4    g_ViewProjMatrixPrevFrame;
+    float4x4    g_ReprojectProjToPrevFrame;
 
     float4      g_ScreenSize;
     float4      g_ScreenSizeHalfRes;
@@ -27,7 +28,9 @@ cbuffer GlobalViewportBuffer : register(b1) // Global
     float4      g_EyeZAxis;
 
     float4      g_ReprojectInfo;
+    float4      g_ReprojectInfoHalfRes;
     float4      g_ReprojectInfoFromInt;   // added half pixel offset to center it
+    float4      g_ReprojectInfoHalfResFromInt;   // added half pixel offset to center it
 
     float4      g_WorldBoundsMin;
     float4      g_WorldBoundsMax;
@@ -36,7 +39,6 @@ cbuffer GlobalViewportBuffer : register(b1) // Global
     float       g_zNear;
     float       g_zFar;
 
-    float       g_TemporalAA;             // Param, Default: 1.0, Range:0.0-1.0, Linear
     float       g_FrameJitter;
     float       g_ReprojectDepthScale;    // Scripted
     float       g_ReprojectDepthBias;     // Scripted
@@ -69,7 +71,7 @@ cbuffer ForwardPassBuffer : register(b3)
     /// Lighting
     float       g_LightBrightness;        // Param, Default: 2.0, Range:0.0-4.0, Gamma
     float       g_PointLightBrightness;   // Param, Default: 4.0, Range:0.0-16.0, Gamma
-    float       g_Roughness;              // Param, Default: 0.7, Range:0.02-0.98, Linear
+    float       g_Roughness;              // Param, Default: 0.5, Range:0.02-0.98, Linear
     float       g_SpecularReflectance;    // Param, Default: 0.03, Range:0.01-0.98, Linear
     float       g_SpecularGlossiness;     // Scripted
 
@@ -101,7 +103,7 @@ cbuffer PostEffects : register(b4)
     cameraCoCScale = g_DofCoCScale * g_ScreenSize_y / 720.0             -- depends on focal length & aperture, rescale it to screen res
     g_CocBias = cameraCoCScale * (1.0 - focusPlaneShifted / g_zNear)
     g_CocScale = cameraCoCScale * focusPlaneShifted * (g_zFar - g_zNear) / (g_zFar * g_zNear)
-    g_VolumetricFogFinalScattering = g_VolumetricFogScattering * 0.06
+    g_VolumetricFogFinalScattering = g_VolumetricFogScattering * 0.03
     ENDSCRIPT */
 };
 
@@ -113,6 +115,7 @@ struct VS_OUTPUT_POSTFX
 
 static const float3 LUMINANCE_VECTOR = float3(0.299f, 0.587f, 0.114f);
 
+StructuredBuffer<float> RandomNumBuffer : register(t39);
 
 #define GI_VOLUME_RESOLUTION_X 64.0 // GlobalDefine
 #define GI_VOLUME_RESOLUTION_Y 32.0 // GlobalDefine
@@ -166,5 +169,46 @@ float4 SH2CosineResponse(float3 dir)
 {
     return SH2DirectionResponse(dir) * float4(SH0COS, SH1COS, SH1COS, SH1COS);
 }
+
+#define BILAT_PACK 0.25f
+#define BILAT_UNPACK (1.0f / BILAT_PACK)
+
+Texture2D<float2> InputTextureBilateralOffsets  : register(t10);
+
+float2 GetBilateralUV(float2 uv)
+{
+    float2 upSampleOffset = InputTextureBilateralOffsets.SampleLevel(pointSampler, uv, 0);
+    return uv + upSampleOffset * g_ScreenSizeHalfRes.zw * BILAT_UNPACK;
+}
+
+
+// Gather layout
+// w z
+// x y
+
+#define GATHER_UOFFSET_X float2(0, 1)
+#define GATHER_UOFFSET_Y float2(1, 1)
+#define GATHER_UOFFSET_Z float2(1, 0)
+#define GATHER_UOFFSET_W float2(0, 0)
+
+
+#define GATHER_SOFFSET_X float2(-1, 1)
+#define GATHER_SOFFSET_Y float2(1, 1)
+#define GATHER_SOFFSET_Z float2(1, -1)
+#define GATHER_SOFFSET_W float2(-1,-1)
+
+
+// BW TODO
+float RoughnessToMipLevel(float r)
+{
+    return 7.0f * saturate(r);
+}
+
+float MipLevelToRoughness(float m)
+{
+    return saturate(m / 7.0f);
+}
+
+
 
 #endif

@@ -6,19 +6,26 @@ using System.Text;
 
 namespace CSharpRenderer
 {
-    static class SurfaceDebugManager
+    static class DebugManager
     {
         public static List<String> m_AvailableModes;
+        public static Dictionary<String, bool> m_AvailableFeatures;
         static RenderTargetSet m_DebugRenderTarget;
+        static RenderTargetSet m_SnapshotRenderTarget;
         public static String m_CurrentDebugSurface;
         public static String m_CurrentDebugMode;
         public static bool m_IsUIRebuildRequired;
         public static bool m_GPUDebugOn;
         public static bool m_FirstCallThisFrame;
         public static GPUBufferObject m_DebugAppendBuffer;
+        public static bool m_DisabledTemporal;
+        public static bool m_TakeSnapshot;
+        public static bool m_ShowSnapshot;
+        public static bool m_ShowSnapshotDifference;
 
-        static SurfaceDebugManager()
+        static DebugManager()
         {
+            m_AvailableFeatures = new Dictionary<string, bool>();
             m_AvailableModes = new List<String>();
             m_AvailableModes.Add("None");
             m_CurrentDebugSurface = "None";
@@ -40,6 +47,7 @@ namespace CSharpRenderer
             };
 
             m_DebugRenderTarget = RenderTargetManager.RequestRenderTargetFromPool(rtDesc);
+            m_SnapshotRenderTarget = RenderTargetManager.RequestRenderTargetFromPool(rtDesc);
             m_DebugAppendBuffer = GPUBufferObject.CreateBuffer(device, 1024, 8 * sizeof(uint), null, true, true);
         }
 
@@ -48,7 +56,7 @@ namespace CSharpRenderer
             m_GPUDebugOn = gpuDebugOn;
         }
 
-        public static void RegisterDebug(DeviceContext context, string name, RenderTargetSet debuggedRT)
+        public static void RegisterDebug(DeviceContext context, string name, RenderTargetSet debuggedRT, int rtNum = 0)
         {
             if (m_AvailableModes.Contains(name))
             {
@@ -56,15 +64,19 @@ namespace CSharpRenderer
                 {
                     if (m_CurrentDebugMode == "A")
                     {
-                        PostEffectHelper.CopyAlpha(context, m_DebugRenderTarget, debuggedRT);
+                        PostEffectHelper.CopyAlpha(context, m_DebugRenderTarget, debuggedRT, rtNum);
                     }
                     else if (m_CurrentDebugMode == "FRAC")
                     {
-                        PostEffectHelper.CopyFrac(context, m_DebugRenderTarget, debuggedRT);
+                        PostEffectHelper.CopyFrac(context, m_DebugRenderTarget, debuggedRT, rtNum);
+                    }
+                    else if (m_CurrentDebugMode == "RGBGamma")
+                    {
+                        PostEffectHelper.CopyGamma(context, m_DebugRenderTarget, debuggedRT, rtNum);
                     }
                     else
                     {
-                        PostEffectHelper.Copy(context, m_DebugRenderTarget, debuggedRT);
+                        PostEffectHelper.Copy(context, m_DebugRenderTarget, debuggedRT, rtNum);
                     }
                 }
             }
@@ -73,6 +85,40 @@ namespace CSharpRenderer
                 m_IsUIRebuildRequired = true;
                 m_AvailableModes.Add(name);
             }
+        }
+
+        public static bool IsFeatureOn(string name)
+        {
+            bool retVal;
+            if(m_AvailableFeatures.TryGetValue(name, out retVal))
+            {
+                return retVal;
+            }
+            else
+            {
+                m_AvailableFeatures.Add(name, true);
+                m_IsUIRebuildRequired = true;
+            }
+
+            return true;
+        }
+
+        public static bool IsDebugging(string name)
+        {
+            if (m_AvailableModes.Contains(name))
+            {
+                if (m_CurrentDebugSurface == name)
+                {
+                    return true;
+                }
+            }
+            else
+            {
+                m_IsUIRebuildRequired = true;
+                m_AvailableModes.Add(name);
+            }
+
+            return false;
         }
 
         public static string GetDebugString(DeviceContext context)
@@ -133,6 +179,23 @@ namespace CSharpRenderer
             if (m_CurrentDebugSurface != "None")
             {
                 PostEffectHelper.Copy(context, target, m_DebugRenderTarget);
+            }
+            if (m_TakeSnapshot)
+            {
+                PostEffectHelper.Copy(context, m_SnapshotRenderTarget, target);
+                m_TakeSnapshot = false;
+            }
+            if (m_ShowSnapshot)
+            {
+                if (m_ShowSnapshotDifference)
+                {
+                    PostEffectHelper.Copy(context, m_DebugRenderTarget, target);
+                    PostEffectHelper.Difference(context, target, m_SnapshotRenderTarget, m_DebugRenderTarget);
+                }
+                else
+                {
+                    PostEffectHelper.Copy(context, target, m_SnapshotRenderTarget);
+                }
             }
         }
 

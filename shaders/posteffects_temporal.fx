@@ -46,7 +46,7 @@ float4 ResolveTemporalMotionBased(VS_OUTPUT_POSTFX i) : SV_Target
     textureSamplePrevFrame *= mult;
 
     // magic number, works well in high fps, 50+
-    float finalWeight = saturate(0.05f + weight);
+    float finalWeight = saturate(0.1f + weight);
 #else
     float finalWeight = 0.5f + 0.5f * weight;
 #endif

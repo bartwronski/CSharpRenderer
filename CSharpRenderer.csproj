@@ -89,16 +89,19 @@
     <Compile Include="Algorithms\GeometricsAlgorithms.cs" />
     <Compile Include="Algorithms\GlobalIllumination.cs" />
     <Compile Include="Framework parts\RenderTargetManager.cs" />
-    <Compile Include="Framework parts\SurfaceDebugManager.cs" />
+    <Compile Include="Framework parts\DebugManager.cs" />
     <Compile Include="Helpers\CubemapRenderHelper.cs" />
+    <Compile Include="Helpers\LightingLUTHelper.cs" />
     <Compile Include="Helpers\PerlinNoiseHelper.cs" />
     <Compile Include="Helpers\PostEffectHelper.cs" />
     <Compile Include="PostEffects\FXAA.cs" />
     <Compile Include="PostEffects\LuminanceCalculation.cs" />
     <Compile Include="PostEffects\ResolveHDR.cs" />
     <Compile Include="PostEffects\SSAO.cs" />
+    <Compile Include="PostEffects\SSReflections.cs" />
     <Compile Include="PostEffects\Temporal.cs" />
     <Compile Include="PostEffects\ScatterDOF.cs" />
+    <Compile Include="Render passes\DepthOperations.cs" />
     <Compile Include="Render passes\ShadowEVSMGenerator.cs" />
     <Compile Include="Render passes\VolumetricFog.cs" />
     <Compile Include="Scene management\Camera.cs" />
@@ -149,6 +152,7 @@
   <ItemGroup>
     <Content Include="Shaders\compute.fx" />
     <Content Include="Shaders\constants.fx" />
+    <Content Include="Shaders\depth_operations.fx" />
     <Content Include="Shaders\derivative_mapping_inc.fx" />
     <Content Include="Shaders\evsm.fx" />
     <Content Include="Shaders\evsm_inc.fx" />
@@ -166,6 +170,7 @@
     <Content Include="Shaders\shader_debug_inc.fx" />
     <Content Include="Shaders\shader_fast_math.fx" />
     <Content Include="Shaders\ssao.fx" />
+    <Content Include="Shaders\ssreflections.fx" />
     <Content Include="Shaders\volumetric_fog.fx" />
     <Content Include="Shaders\volumetric_fog_inc.fx" />
   </ItemGroup>

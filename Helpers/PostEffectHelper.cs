@@ -100,11 +100,11 @@ namespace CSharpRenderer
             context.DrawIndexed(6 * quadCount, 0, 0);
         }
 
-        public static void Copy(DeviceContext context, RenderTargetSet target, RenderTargetSet source)
+        public static void Copy(DeviceContext context, RenderTargetSet target, RenderTargetSet source, int rtNum = 0)
         {
             using (new GpuProfilePoint(context, "Copy"))
             {
-                source.BindSRV(context, 0);
+                source.BindSRV(context, 0, rtNum);
                 target.BindAsRenderTarget(context);
                 PostEffectHelper.RenderFullscreenTriangle(context, "Copy");
                 RenderTargetSet.BindNull(context);
@@ -112,11 +112,23 @@ namespace CSharpRenderer
             }
         }
 
-        public static void CopyAlpha(DeviceContext context, RenderTargetSet target, RenderTargetSet source)
+        public static void CopyGamma(DeviceContext context, RenderTargetSet target, RenderTargetSet source, int rtNum = 0)
         {
             using (new GpuProfilePoint(context, "Copy"))
             {
-                source.BindSRV(context, 0);
+                source.BindSRV(context, 0, rtNum);
+                target.BindAsRenderTarget(context);
+                PostEffectHelper.RenderFullscreenTriangle(context, "CopyGamma");
+                RenderTargetSet.BindNull(context);
+                ContextHelper.ClearSRVs(context);
+            }
+        }
+
+        public static void CopyAlpha(DeviceContext context, RenderTargetSet target, RenderTargetSet source, int rtNum = 0)
+        {
+            using (new GpuProfilePoint(context, "Copy"))
+            {
+                source.BindSRV(context, 0, rtNum);
                 target.BindAsRenderTarget(context);
                 PostEffectHelper.RenderFullscreenTriangle(context, "CopyAlpha");
                 RenderTargetSet.BindNull(context);
@@ -124,13 +136,26 @@ namespace CSharpRenderer
             }
         }
 
-        public static void CopyFrac(DeviceContext context, RenderTargetSet target, RenderTargetSet source)
+        public static void CopyFrac(DeviceContext context, RenderTargetSet target, RenderTargetSet source, int rtNum = 0)
         {
             using (new GpuProfilePoint(context, "Copy"))
             {
-                source.BindSRV(context, 0);
+                source.BindSRV(context, 0, rtNum);
                 target.BindAsRenderTarget(context);
                 PostEffectHelper.RenderFullscreenTriangle(context, "CopyFrac");
+                RenderTargetSet.BindNull(context);
+                ContextHelper.ClearSRVs(context);
+            }
+        }
+
+        public static void Difference(DeviceContext context, RenderTargetSet target, RenderTargetSet source1, RenderTargetSet source2, int rtNum = 0)
+        {
+            using (new GpuProfilePoint(context, "Difference"))
+            {
+                source1.BindSRV(context, 0, rtNum);
+                source2.BindSRV(context, 1, rtNum);
+                target.BindAsRenderTarget(context);
+                PostEffectHelper.RenderFullscreenTriangle(context, "Difference");
                 RenderTargetSet.BindNull(context);
                 ContextHelper.ClearSRVs(context);
             }

@@ -309,6 +309,7 @@ namespace CSharpRenderer
         public CustomConstantBufferDefinition  m_Definition;
         public Dictionary<String, object>      m_Values;
         public SlimDX.Direct3D11.Buffer        m_ConstantBuffer;
+        public Lua                             m_LuaContext;
 
         public static object            m_Lock;
         public static HashSet<CustomConstantBufferInstance> s_AllGlobalInstances;
@@ -334,6 +335,11 @@ namespace CSharpRenderer
                 }
                 s_AllInstances.Add(this);
             }
+        }
+
+        ~CustomConstantBufferInstance()
+        {
+            m_LuaContext.Dispose();
         }
 
         public void CreateBufferInstance(CustomConstantBufferDefinition baseDefinition, Device device, bool newInstance)
@@ -368,6 +374,7 @@ namespace CSharpRenderer
                 CpuAccessFlags.Write,
                 ResourceOptionFlags.None,
                 0);
+            m_LuaContext = new Lua();
         }
 
         public override bool TryGetMember(GetMemberBinder binder, out object result)
@@ -404,34 +411,7 @@ namespace CSharpRenderer
         {
             return m_Size;
         }
-
-        private byte[] StructToByteArray(object o)
-        {
-            try
-            {
-                // This function copies the structure data into a byte[] 
-
-                //Set the buffer to the correct size 
-                byte[] buffer = new byte[Marshal.SizeOf(o)];
-
-                //Allocate the buffer to memory and pin it so that GC cannot use the 
-                //space (Disable GC) 
-                GCHandle h = GCHandle.Alloc(buffer, GCHandleType.Pinned);
-
-                // copy the struct into int byte[] mem alloc 
-                Marshal.StructureToPtr(o, h.AddrOfPinnedObject(), false);
-
-                h.Free(); //Allow GC to do its job 
-
-                return buffer; // return the byte[]. After all that's why we are here 
-                // right. 
-            }
-            catch (Exception ex)
-            {
-                throw ex;
-            }
-        }
-
+        
         public void Bind(DeviceContext context)
         {
             ContextHelper.SetConstantBuffer(context, m_ConstantBuffer, m_Definition.m_Register);
@@ -462,54 +442,51 @@ namespace CSharpRenderer
             var scriptedProperties = m_Definition.GetScriptedProperties();
             if (scriptedProperties.Count > 0)
             {
-                using( Lua luaContext = new Lua() )
+                foreach (var globalBuffer in s_AllGlobalInstances)
                 {
-                    foreach (var globalBuffer in s_AllGlobalInstances)
+                    foreach (var val in globalBuffer.m_Values)
                     {
-                        foreach (var val in globalBuffer.m_Values)
-                        {
-                            string name = val.Key;
-                            object value = val.Value;
-                            FillScriptLuaContext(luaContext, name, value);
-                        }
-
-                        var bufferParamProperties = globalBuffer.m_Definition.GetParamProperties();
-                        foreach (var param in bufferParamProperties)
-                        {
-                            string name = param.name;
-                            object value = param.paramValue;
-                            FillScriptLuaContext(luaContext, name, value);
-                        }
-                    }
-                    if (!s_AllGlobalInstances.Contains(this))
-                    {
-                        foreach (var val in m_Values)
-                        {
-                            string name = val.Key;
-                            object value = val.Value;
-                            FillScriptLuaContext(luaContext, name, value);
-                        }
-
-                        var bufferParamProperties = m_Definition.GetParamProperties();
-                        foreach (var param in bufferParamProperties)
-                        {
-                            string name = param.name;
-                            object value = param.paramValue;
-                            FillScriptLuaContext(luaContext, name, value);
-                        }
+                        string name = val.Key;
+                        object value = val.Value;
+                        FillScriptLuaContext(m_LuaContext, name, value);
                     }
 
-                    // Execute!
-                    luaContext.DoString(m_Definition.m_Script);
-
-                    foreach (var scriptedProperty in scriptedProperties)
+                    var bufferParamProperties = globalBuffer.m_Definition.GetParamProperties();
+                    foreach (var param in bufferParamProperties)
                     {
-                        m_Writer.Seek(scriptedProperty.byteOffset, SeekOrigin.Begin);
-                        CustomConstantBufferDefinition.ConstantType type = scriptedProperty.type;
-                        float value = (float)(double)luaContext[scriptedProperty.name];
-
-                        BufferWriteType(type, value);
+                        string name = param.name;
+                        object value = param.paramValue;
+                        FillScriptLuaContext(m_LuaContext, name, value);
                     }
+                }
+                if (!s_AllGlobalInstances.Contains(this))
+                {
+                    foreach (var val in m_Values)
+                    {
+                        string name = val.Key;
+                        object value = val.Value;
+                        FillScriptLuaContext(m_LuaContext, name, value);
+                    }
+
+                    var bufferParamProperties = m_Definition.GetParamProperties();
+                    foreach (var param in bufferParamProperties)
+                    {
+                        string name = param.name;
+                        object value = param.paramValue;
+                        FillScriptLuaContext(m_LuaContext, name, value);
+                    }
+                }
+
+                // Execute!
+                m_LuaContext.DoString(m_Definition.m_Script);
+
+                foreach (var scriptedProperty in scriptedProperties)
+                {
+                    m_Writer.Seek(scriptedProperty.byteOffset, SeekOrigin.Begin);
+                    CustomConstantBufferDefinition.ConstantType type = scriptedProperty.type;
+                    float value = (float)(double)m_LuaContext[scriptedProperty.name];
+
+                    BufferWriteType(type, value);
                 }
             }
 
@@ -536,7 +513,7 @@ namespace CSharpRenderer
                     m_Writer.Write((Int32)value);
                     break;
                 default:
-                    m_Writer.Write(StructToByteArray(value));
+                    m_Writer.Write(StructTools.RawSerialize(value));
                     break;
             }
         }

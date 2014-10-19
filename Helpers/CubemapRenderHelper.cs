@@ -13,6 +13,7 @@ namespace CSharpRenderer
     static class CubemapRenderHelper
     {
         static CustomConstantBufferInstance m_CurrentViewportBuffer;
+        static CustomConstantBufferInstance m_CubemapDownsampleBuffer;
 
         static CubemapRenderHelper()
         {
@@ -21,6 +22,27 @@ namespace CSharpRenderer
         public static void Initialize( Device device)
         {
             m_CurrentViewportBuffer = ShaderManager.CreateConstantBufferInstance("CurrentViewport", device);
+            m_CubemapDownsampleBuffer = ShaderManager.CreateConstantBufferInstance("CubemapDownsample", device);
+        }
+
+        public static void GenerateCubemapMips(DeviceContext context, string shader, TextureObject targetTexture, TextureObject sourceTexture)
+        {
+            for (int m = 0; m < targetTexture.m_Mips; ++m)
+            {
+                for (int i = 0; i < 6; ++i)
+                {
+                    dynamic cdb = m_CubemapDownsampleBuffer;
+                    cdb.g_Mip = (float)m;
+                    cdb.g_Face = i;
+                    m_CubemapDownsampleBuffer.CompileAndBind(context);
+
+                    RenderTargetSet.BindTextureAsRenderTarget(context, targetTexture.m_ArrayRenderTargetViews[m * 6 + i], null, targetTexture.m_Width >> m, targetTexture.m_Height >> m);
+                    context.PixelShader.SetShaderResource(PostEffectHelper.m_RandomNumbersBuffer.m_ShaderResourceView, 39);
+                    context.PixelShader.SetShaderResource(sourceTexture.m_ShaderResourceView, 0);
+                    PostEffectHelper.RenderFullscreenTriangle(context, shader);
+                    RenderTargetSet.BindNull(context);
+                }
+            }
         }
 
         public static void RenderCubemap(DeviceContext context, TextureObject targetTexture, TextureObject targetDepth, SimpleSceneWrapper sceneWrapper, Vector3 position, float range, bool depthOnly = false, Color4 clearColor = new Color4())

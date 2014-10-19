@@ -20,6 +20,7 @@ namespace CSharpRenderer
             LinearClamp,
             LinearComparisonClamp,
             AnisotropicClamp,
+            AnisotropicWrap,
         }
 
         static SamplerState[] m_SamplerStates;
@@ -108,6 +109,19 @@ namespace CSharpRenderer
             };
 
             m_SamplerStates[(int)SamplerType.AnisotropicClamp] = SamplerState.FromDescription(device, samplerDescription);
+
+            samplerDescription = new SamplerDescription()
+            {
+                AddressU = TextureAddressMode.Wrap,
+                AddressV = TextureAddressMode.Wrap,
+                AddressW = TextureAddressMode.Wrap,
+                Filter = Filter.Anisotropic,
+                MinimumLod = 0,
+                MaximumLod = 255,
+                MaximumAnisotropy = 4,
+            };
+
+            m_SamplerStates[(int)SamplerType.AnisotropicWrap] = SamplerState.FromDescription(device, samplerDescription);
         }
 
         public static SamplerState GetSamplerState(SamplerType type)
@@ -136,6 +150,8 @@ namespace CSharpRenderer
                     return m_SamplerStates[(int)SamplerType.LinearComparisonClamp];
                 case "anisoSampler":
                     return m_SamplerStates[(int)SamplerType.AnisotropicClamp];
+                case "anisoWrapSampler":
+                    return m_SamplerStates[(int)SamplerType.AnisotropicWrap];
                 default:
                     throw new Exception("Unrecognized sampler!");
             }

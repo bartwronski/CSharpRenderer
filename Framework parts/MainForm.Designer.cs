@@ -35,11 +35,15 @@
             this.label1 = new System.Windows.Forms.Label();
             this.debugViewSelect = new System.Windows.Forms.ComboBox();
             this.debugViewImageMode = new System.Windows.Forms.ComboBox();
-            this.flowLayoutPanel2 = new System.Windows.Forms.FlowLayoutPanel();
             this.debugOnCheckBox = new System.Windows.Forms.CheckBox();
+            this.flowLayoutPanel2 = new System.Windows.Forms.FlowLayoutPanel();
             this.gbuDebugCheckBox = new System.Windows.Forms.CheckBox();
             this.overrideGPUDebugPositionCheckBox = new System.Windows.Forms.CheckBox();
             this.freezeTimeCB = new System.Windows.Forms.CheckBox();
+            this.noTemporalCB = new System.Windows.Forms.CheckBox();
+            this.takeSnapshotBtn = new System.Windows.Forms.Button();
+            this.showSnapshotCB = new System.Windows.Forms.CheckBox();
+            this.differenceCB = new System.Windows.Forms.CheckBox();
             this.tableLayoutPanel2 = new System.Windows.Forms.TableLayoutPanel();
             this.overrideGPUDebugPositionXUD = new System.Windows.Forms.NumericUpDown();
             this.overrideGPUDebugPositionYUD = new System.Windows.Forms.NumericUpDown();
@@ -47,6 +51,7 @@
             this.label2 = new System.Windows.Forms.Label();
             this.label3 = new System.Windows.Forms.Label();
             this.label4 = new System.Windows.Forms.Label();
+            this.pickPixelButton = new System.Windows.Forms.Button();
             this.gpuDebugTextBox = new System.Windows.Forms.TextBox();
             this.panel1 = new System.Windows.Forms.Panel();
             this.splitContainer1 = new System.Windows.Forms.SplitContainer();
@@ -55,7 +60,7 @@
             this.dataGridView1 = new System.Windows.Forms.DataGridView();
             this.ProfilerName = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.Time = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.pickPixelButton = new System.Windows.Forms.Button();
+            this.featureListBox = new System.Windows.Forms.CheckedListBox();
             ((System.ComponentModel.ISupportInitialize)(this.mainSplit)).BeginInit();
             this.mainSplit.Panel1.SuspendLayout();
             this.mainSplit.Panel2.SuspendLayout();
@@ -122,6 +127,7 @@
             this.flowLayoutPanel1.Controls.Add(this.flowLayoutPanel2);
             this.flowLayoutPanel1.Controls.Add(this.tableLayoutPanel2);
             this.flowLayoutPanel1.Controls.Add(this.gpuDebugTextBox);
+            this.flowLayoutPanel1.Controls.Add(this.featureListBox);
             this.flowLayoutPanel1.Dock = System.Windows.Forms.DockStyle.Fill;
             this.flowLayoutPanel1.Location = new System.Drawing.Point(0, 0);
             this.flowLayoutPanel1.Name = "flowLayoutPanel1";
@@ -134,17 +140,18 @@
             this.flowLayoutPanel3.Controls.Add(this.label1);
             this.flowLayoutPanel3.Controls.Add(this.debugViewSelect);
             this.flowLayoutPanel3.Controls.Add(this.debugViewImageMode);
+            this.flowLayoutPanel3.Controls.Add(this.debugOnCheckBox);
             this.flowLayoutPanel3.FlowDirection = System.Windows.Forms.FlowDirection.TopDown;
             this.flowLayoutPanel3.Location = new System.Drawing.Point(3, 3);
             this.flowLayoutPanel3.Name = "flowLayoutPanel3";
-            this.flowLayoutPanel3.Size = new System.Drawing.Size(127, 67);
+            this.flowLayoutPanel3.Size = new System.Drawing.Size(134, 90);
             this.flowLayoutPanel3.TabIndex = 9;
             // 
             // label1
             // 
             this.label1.Anchor = System.Windows.Forms.AnchorStyles.Top;
             this.label1.AutoSize = true;
-            this.label1.Location = new System.Drawing.Point(31, 0);
+            this.label1.Location = new System.Drawing.Point(34, 0);
             this.label1.Name = "label1";
             this.label1.Size = new System.Drawing.Size(65, 13);
             this.label1.TabIndex = 1;
@@ -168,6 +175,7 @@
             this.debugViewImageMode.FormattingEnabled = true;
             this.debugViewImageMode.Items.AddRange(new object[] {
             "RGB",
+            "RGBGamma",
             "A",
             "FRAC"});
             this.debugViewImageMode.Location = new System.Drawing.Point(3, 43);
@@ -175,34 +183,37 @@
             this.debugViewImageMode.Size = new System.Drawing.Size(121, 21);
             this.debugViewImageMode.TabIndex = 2;
             // 
-            // flowLayoutPanel2
-            // 
-            this.flowLayoutPanel2.Controls.Add(this.debugOnCheckBox);
-            this.flowLayoutPanel2.Controls.Add(this.gbuDebugCheckBox);
-            this.flowLayoutPanel2.Controls.Add(this.overrideGPUDebugPositionCheckBox);
-            this.flowLayoutPanel2.Controls.Add(this.freezeTimeCB);
-            this.flowLayoutPanel2.FlowDirection = System.Windows.Forms.FlowDirection.TopDown;
-            this.flowLayoutPanel2.Location = new System.Drawing.Point(136, 3);
-            this.flowLayoutPanel2.Name = "flowLayoutPanel2";
-            this.flowLayoutPanel2.Size = new System.Drawing.Size(200, 100);
-            this.flowLayoutPanel2.TabIndex = 8;
-            // 
             // debugOnCheckBox
             // 
             this.debugOnCheckBox.AutoSize = true;
             this.debugOnCheckBox.Checked = true;
             this.debugOnCheckBox.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.debugOnCheckBox.Location = new System.Drawing.Point(3, 3);
+            this.debugOnCheckBox.Location = new System.Drawing.Point(3, 70);
             this.debugOnCheckBox.Name = "debugOnCheckBox";
             this.debugOnCheckBox.Size = new System.Drawing.Size(128, 17);
             this.debugOnCheckBox.TabIndex = 3;
             this.debugOnCheckBox.Text = "Surface debug on/off";
             this.debugOnCheckBox.UseVisualStyleBackColor = true;
             // 
+            // flowLayoutPanel2
+            // 
+            this.flowLayoutPanel2.Controls.Add(this.gbuDebugCheckBox);
+            this.flowLayoutPanel2.Controls.Add(this.overrideGPUDebugPositionCheckBox);
+            this.flowLayoutPanel2.Controls.Add(this.freezeTimeCB);
+            this.flowLayoutPanel2.Controls.Add(this.noTemporalCB);
+            this.flowLayoutPanel2.Controls.Add(this.takeSnapshotBtn);
+            this.flowLayoutPanel2.Controls.Add(this.showSnapshotCB);
+            this.flowLayoutPanel2.Controls.Add(this.differenceCB);
+            this.flowLayoutPanel2.FlowDirection = System.Windows.Forms.FlowDirection.TopDown;
+            this.flowLayoutPanel2.Location = new System.Drawing.Point(143, 3);
+            this.flowLayoutPanel2.Name = "flowLayoutPanel2";
+            this.flowLayoutPanel2.Size = new System.Drawing.Size(281, 100);
+            this.flowLayoutPanel2.TabIndex = 8;
+            // 
             // gbuDebugCheckBox
             // 
             this.gbuDebugCheckBox.AutoSize = true;
-            this.gbuDebugCheckBox.Location = new System.Drawing.Point(3, 26);
+            this.gbuDebugCheckBox.Location = new System.Drawing.Point(3, 3);
             this.gbuDebugCheckBox.Name = "gbuDebugCheckBox";
             this.gbuDebugCheckBox.Size = new System.Drawing.Size(126, 17);
             this.gbuDebugCheckBox.TabIndex = 5;
@@ -212,7 +223,7 @@
             // overrideGPUDebugPositionCheckBox
             // 
             this.overrideGPUDebugPositionCheckBox.AutoSize = true;
-            this.overrideGPUDebugPositionCheckBox.Location = new System.Drawing.Point(3, 49);
+            this.overrideGPUDebugPositionCheckBox.Location = new System.Drawing.Point(3, 26);
             this.overrideGPUDebugPositionCheckBox.Name = "overrideGPUDebugPositionCheckBox";
             this.overrideGPUDebugPositionCheckBox.Size = new System.Drawing.Size(166, 17);
             this.overrideGPUDebugPositionCheckBox.TabIndex = 3;
@@ -223,12 +234,53 @@
             // 
             this.freezeTimeCB.Anchor = System.Windows.Forms.AnchorStyles.Left;
             this.freezeTimeCB.AutoSize = true;
-            this.freezeTimeCB.Location = new System.Drawing.Point(3, 72);
+            this.freezeTimeCB.Location = new System.Drawing.Point(3, 49);
             this.freezeTimeCB.Name = "freezeTimeCB";
             this.freezeTimeCB.Size = new System.Drawing.Size(80, 17);
             this.freezeTimeCB.TabIndex = 7;
             this.freezeTimeCB.Text = "Freeze time";
             this.freezeTimeCB.UseVisualStyleBackColor = true;
+            // 
+            // noTemporalCB
+            // 
+            this.noTemporalCB.Anchor = System.Windows.Forms.AnchorStyles.Left;
+            this.noTemporalCB.AutoSize = true;
+            this.noTemporalCB.Location = new System.Drawing.Point(3, 72);
+            this.noTemporalCB.Name = "noTemporalCB";
+            this.noTemporalCB.Size = new System.Drawing.Size(83, 17);
+            this.noTemporalCB.TabIndex = 3;
+            this.noTemporalCB.Text = "No temporal";
+            this.noTemporalCB.UseVisualStyleBackColor = true;
+            // 
+            // takeSnapshotBtn
+            // 
+            this.takeSnapshotBtn.Location = new System.Drawing.Point(175, 3);
+            this.takeSnapshotBtn.Name = "takeSnapshotBtn";
+            this.takeSnapshotBtn.Size = new System.Drawing.Size(94, 23);
+            this.takeSnapshotBtn.TabIndex = 9;
+            this.takeSnapshotBtn.Text = "Take snapshot";
+            this.takeSnapshotBtn.UseVisualStyleBackColor = true;
+            this.takeSnapshotBtn.Click += new System.EventHandler(this.takeSnapshotBtn_Click);
+            // 
+            // showSnapshotCB
+            // 
+            this.showSnapshotCB.AutoSize = true;
+            this.showSnapshotCB.Location = new System.Drawing.Point(175, 32);
+            this.showSnapshotCB.Name = "showSnapshotCB";
+            this.showSnapshotCB.Size = new System.Drawing.Size(99, 17);
+            this.showSnapshotCB.TabIndex = 10;
+            this.showSnapshotCB.Text = "Show snapshot";
+            this.showSnapshotCB.UseVisualStyleBackColor = true;
+            // 
+            // differenceCB
+            // 
+            this.differenceCB.AutoSize = true;
+            this.differenceCB.Location = new System.Drawing.Point(175, 55);
+            this.differenceCB.Name = "differenceCB";
+            this.differenceCB.Size = new System.Drawing.Size(75, 17);
+            this.differenceCB.TabIndex = 11;
+            this.differenceCB.Text = "Difference";
+            this.differenceCB.UseVisualStyleBackColor = true;
             // 
             // tableLayoutPanel2
             // 
@@ -244,7 +296,7 @@
             this.tableLayoutPanel2.Controls.Add(this.label3, 0, 1);
             this.tableLayoutPanel2.Controls.Add(this.label4, 0, 2);
             this.tableLayoutPanel2.Controls.Add(this.pickPixelButton, 1, 3);
-            this.tableLayoutPanel2.Location = new System.Drawing.Point(342, 3);
+            this.tableLayoutPanel2.Location = new System.Drawing.Point(430, 3);
             this.tableLayoutPanel2.Name = "tableLayoutPanel2";
             this.tableLayoutPanel2.RowCount = 4;
             this.tableLayoutPanel2.RowStyles.Add(new System.Windows.Forms.RowStyle());
@@ -320,10 +372,20 @@
             this.label4.TabIndex = 7;
             this.label4.Text = "Override Z";
             // 
+            // pickPixelButton
+            // 
+            this.pickPixelButton.Location = new System.Drawing.Point(66, 81);
+            this.pickPixelButton.Name = "pickPixelButton";
+            this.pickPixelButton.Size = new System.Drawing.Size(89, 23);
+            this.pickPixelButton.TabIndex = 8;
+            this.pickPixelButton.Text = "Pick Last Pixel";
+            this.pickPixelButton.UseVisualStyleBackColor = true;
+            this.pickPixelButton.Click += new System.EventHandler(this.pickPixelButton_Click);
+            // 
             // gpuDebugTextBox
             // 
             this.gpuDebugTextBox.Dock = System.Windows.Forms.DockStyle.Top;
-            this.gpuDebugTextBox.Location = new System.Drawing.Point(506, 3);
+            this.gpuDebugTextBox.Location = new System.Drawing.Point(594, 3);
             this.gpuDebugTextBox.Multiline = true;
             this.gpuDebugTextBox.Name = "gpuDebugTextBox";
             this.gpuDebugTextBox.ReadOnly = true;
@@ -428,15 +490,14 @@
             this.Time.ReadOnly = true;
             this.Time.Width = 50;
             // 
-            // pickPixelButton
+            // featureListBox
             // 
-            this.pickPixelButton.Location = new System.Drawing.Point(66, 81);
-            this.pickPixelButton.Name = "pickPixelButton";
-            this.pickPixelButton.Size = new System.Drawing.Size(89, 23);
-            this.pickPixelButton.TabIndex = 8;
-            this.pickPixelButton.Text = "Pick Last Pixel";
-            this.pickPixelButton.UseVisualStyleBackColor = true;
-            this.pickPixelButton.Click += new System.EventHandler(this.pickPixelButton_Click);
+            this.featureListBox.Dock = System.Windows.Forms.DockStyle.Left;
+            this.featureListBox.FormattingEnabled = true;
+            this.featureListBox.Location = new System.Drawing.Point(903, 3);
+            this.featureListBox.Name = "featureListBox";
+            this.featureListBox.Size = new System.Drawing.Size(120, 107);
+            this.featureListBox.TabIndex = 10;
             // 
             // CSharpRendererMainForm
             // 
@@ -508,5 +569,10 @@
         private System.Windows.Forms.FlowLayoutPanel flowLayoutPanel3;
         private System.Windows.Forms.FlowLayoutPanel flowLayoutPanel2;
         private System.Windows.Forms.Button pickPixelButton;
+        private System.Windows.Forms.CheckBox noTemporalCB;
+        private System.Windows.Forms.Button takeSnapshotBtn;
+        private System.Windows.Forms.CheckBox showSnapshotCB;
+        private System.Windows.Forms.CheckBox differenceCB;
+        private System.Windows.Forms.CheckedListBox featureListBox;
     }
 }

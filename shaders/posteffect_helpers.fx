@@ -4,9 +4,9 @@
 // PixelShader:  ResolveHDR, entry: ResolvePS
 // PixelShader:  Copy, entry: PShaderCopy
 // PixelShader:  CopyAlpha, entry: PShaderCopy, defines: ALPHA
+// PixelShader:  CopyGamma, entry: PShaderCopy, defines: GAMMA
 // PixelShader:  CopyFrac, entry: PShaderCopy, defines: FRAC
-// PixelShader:  ResolveMotionVectors, entry: ResolveMotionVectors
-// PixelShader:  LinearizeDepth, entry: PShaderLinearizeDepth
+// PixelShader:  Difference, entry: PShaderDifference
 // PixelShader:  FXAA, entry: FxaaPS
 // PixelShader:  Downsample4x4, entry: Downsample4x4
 // PixelShader:  Downsample4x4Luminance, entry: Downsample4x4Luminance
@@ -18,6 +18,7 @@
 #include "constants.fx"
 
 Texture2D<float4> InputTexture                  : register(t0);
+Texture2D<float4> InputTextureTwo               : register(t1);
 Texture2D<float>  LuminanceTexture              : register(t1);
 RWTexture2D<float> RWTextureLuminance           : register(u0);
 
@@ -46,7 +47,12 @@ float4 PShader(VS_OUTPUT_POSTFX i) : SV_Target
 
 float4 PShaderCopy(VS_OUTPUT_POSTFX i) : SV_Target
 {
-    float4 textureSample = InputTexture.SampleLevel(pointSampler, i.uv, 0);
+    float4 textureSample = InputTexture.SampleLevel(linearSampler, i.uv, 0);
+
+#ifdef GAMMA
+    textureSample.rgb = LinearToGamma(textureSample.rgb);
+#endif
+
 #ifdef ALPHA
     return textureSample.aaaa;
 #elif defined(FRAC)
@@ -56,10 +62,10 @@ float4 PShaderCopy(VS_OUTPUT_POSTFX i) : SV_Target
 #endif
 }
 
-float PShaderLinearizeDepth(VS_OUTPUT_POSTFX i) : SV_Target
+float4 PShaderDifference(VS_OUTPUT_POSTFX i) : SV_Target
 {
-    float textureSample = InputTexture.SampleLevel(pointSampler, i.uv, 0).r;
-    return LinearizeDepth(textureSample);
+    float4 textureSample = 5.0f * abs(InputTexture.SampleLevel(linearSampler, i.uv, 0) - InputTextureTwo.SampleLevel(linearSampler, i.uv, 0));
+    return textureSample;
 }
 
 static const float A = 0.15;
@@ -78,29 +84,14 @@ float3 Uncharted2Tonemap(float3 x)
 
 float4 ResolvePS(VS_OUTPUT_POSTFX i) : SV_Target
 {
-    float4 textureSample = InputTexture.SampleLevel( pointSampler, i.uv, 0 );
+    float4 textureSample = InputTexture.SampleLevel(pointSampler, i.uv, 0 );
     float3 color = Uncharted2Tonemap(textureSample.rgb);
     float avgLuminance = LuminanceTexture[uint2(0,0)];
     float3 whiteScale = 1.0f / Uncharted2Tonemap(2.0f * avgLuminance);
     color = color*whiteScale;
-    return float4(LinearToGamma(color), 1.0f);
-}
+    float noise = (rand(i.uv.xy + g_FrameRandoms.xy) + rand(i.uv.yx + g_FrameRandoms.zw) - 1.0f) / 255.0f;
 
-float4 ResolveMotionVectors(VS_OUTPUT_POSTFX i) : SV_Target
-{
-    float textureSampleDepth = InputTexture.SampleLevel(pointSampler, i.uv, 0).r;
-    float2 screenPos = float2(i.uv * float2(2,-2) + float2(-1,1) );
-    float4 invCoords = mul( g_InvViewProjMatrix, float4(screenPos, textureSampleDepth, 1.0f) ); 
-
-    //float3 worldPos = invCoords.xyz / invCoords.www;
-
-    // TODO: compose matrices together
-    float4 coordsPrevFrame = mul(g_ViewProjMatrixPrevFrame, invCoords);
-    coordsPrevFrame /= coordsPrevFrame.wwww;
-    float2 uvMotionVector = coordsPrevFrame.xy - screenPos;
-    uvMotionVector = uvMotionVector * float2(0.5f,-0.5f);
-    
-    return float4(uvMotionVector, 0.0f, 0.0f);
+    return float4(max(LinearToGamma(color) + noise, 0.0f), 1.0f);
 }
 
 float4 Downsample4x4(VS_OUTPUT_POSTFX i) : SV_Target
@@ -188,8 +179,7 @@ float4 FxaaPS(VS_OUTPUT_POSTFX Input) : SV_TARGET
 {
     FxaaTex tex = { anisoSampler, InputTexture };
 
-    float noise = (rand(Input.uv.xy + g_FrameRandoms.xy)-0.5f) * 4.0f / 255.0f;
     float3 aaImage = FxaaPixelShader(Input.uv.xy, tex, g_ScreenSize.zw);
 
-    return float4(max(aaImage + noise.xxx,0.0f),1.0f);
+    return float4(aaImage,1.0f);
 }
